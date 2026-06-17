@@ -1,0 +1,1076 @@
+[
+  {
+    "category": "Java 基础 & 集合",
+    "question": "HashMap的底层实现原理是什么？",
+    "keywords": "数组+链表+红黑树",
+    "answer": "HashMap底层采用数组+链表+红黑树实现。JDK1.8默认初始容量16，负载因子0.75，元素数量超过容量×负载因子时触发扩容，容量翻倍。put操作时先对key的hashCode()进行扰动运算（高16位异或低16位），再与数组长度减1做与运算得到下标。若该位置无元素直接放入，有元素则判断key是否相同（先比hash再比equals），相同覆盖value，不同以链表形式尾插存储。当链表长度超过8且数组长度大于64时链表转为红黑树，查询时间复杂度从O(n)降为O(log n)。扩容时采用高低位拆分法重新分配元素。线程不安全，多线程环境下需使用ConcurrentHashMap或Collections.synchronizedMap。"
+  },
+  {
+    "category": "Java 基础 & 集合",
+    "question": "ConcurrentHashMap在JDK1.7和1.8有什么区别？",
+    "keywords": "分段锁 vs CAS+synchronized",
+    "answer": "JDK1.7采用Segment分段锁机制，将数据分为16个Segment，每个Segment相当于一个小HashMap并配有一把ReentrantLock。并发写只需锁住对应Segment，不同Segment可并行操作，并发度等于Segment数量。1.8放弃分段锁设计，采用CAS+synchronized实现更细粒度的锁，数据结构变为数组+链表+红黑树。put时若桶位为空则CAS插入Node，不为空则对桶头节点加synchronized锁再操作。1.8还引入sizeCtl变量控制扩容，通过多线程协助扩容提升效率。size计算使用baseCount+CounterCell数组实现类似LongAdder的分段计数。1.8的并发度更高，锁粒度细化到单个桶位，性能显著提升。"
+  },
+  {
+    "category": "Java 基础 & 集合",
+    "question": "HashMap引入红黑树做了哪些改动？",
+    "keywords": "树化条件、退化条件、红黑树节点",
+    "answer": "HashMap在JDK1.8引入红黑树主要改动：第一，节点类型由统一的Entry分为Node和TreeNode，TreeNode继承Node并增加parent、left、right、red等属性。第二，新增树化条件：链表长度超过8（TREEIFY_THRESHOLD）且数组长度大于等于64（MIN_TREEIFY_CAPACITY）时链表转红黑树；数组长度小于64则优先扩容而非树化。第三，新增退化条件：红黑树节点数小于等于6（UNTREEIFY_THRESHOLD）且扩容时红黑树退化回链表。第四，put/get/remove等方法增加了对树结构的判断和操作逻辑。第五，红黑树节点占用空间约为普通节点两倍，设置8作为阈值避免频繁树化的空间开销，同时在高碰撞场景下保持O(log n)查询效率。"
+  },
+  {
+    "category": "Java 基础 & 集合",
+    "question": "HashMap在JDK1.7到1.8还有哪些改动？",
+    "keywords": "头插变尾插、扩容优化、扰动函数",
+    "answer": "除引入红黑树外还有多项重要改动：第一，链表插入方式从头插法改为尾插法，解决JDK1.7扩容时多线程环境下的死循环问题（头插法可能形成环形链表）。第二，扩容机制优化，采用高低位拆分法，通过e.hash和oldCap判断元素在新数组中的位置，要么留在原位要么移到原位加旧容量位置，无需重新计算hash。第三，扰动函数简化，1.7进行四次位运算和五次异或，1.8只做一次高16位异或低16位。第四，null key处理变化，1.7将null key放在table[0]，1.8统一通过hash计算处理。第五，遍历方式改变以适应新的数据结构。这些改动显著提升了HashMap的性能和安全性。"
+  },
+  {
+    "category": "Java 基础 & 集合",
+    "question": "Java集合框架有哪些主要类？分别什么场景？",
+    "keywords": "List、Set、Map及实现类",
+    "answer": "Java集合框架分Collection和Map两大体系。List接口：ArrayList基于动态数组，随机访问快O(1)，增删慢O(n)，适合频繁查询；LinkedList基于双向链表，增删快O(1)，随机访问慢O(n)，适合频繁增删。Set接口：HashSet基于HashMap实现，元素无序不重复，去重依赖hashCode和equals；LinkedHashSet维护插入顺序；TreeSet基于红黑树，元素有序排列。Map接口：HashMap线程不安全，key可为null；LinkedHashMap维护插入或访问顺序，可用于实现LRU缓存；TreeMap基于红黑树，key有序。Vector和Hashtable是早期线程安全集合类性能较差，推荐用Collections工具类包装或使用并发集合如ConcurrentHashMap。选择集合类型应根据线程安全、有序性、性能等需求综合考虑。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是原子性、可见性和有序性？",
+    "keywords": "并发编程三大特性",
+    "answer": "原子性：一个操作或一系列操作不会被中断，要么全部成功要么全部不执行。Java中long或double读写在32位JVM上非原子，synchronized和Lock保证原子性。可见性：线程修改共享变量后其他线程能立即看到最新值。volatile强制将修改后的值刷新到主内存并使其他线程的工作内存缓存失效，synchronized在释放锁前也会将变量刷新到主内存。有序性：程序按代码先后顺序执行，JVM通过指令重排优化性能，volatile通过内存屏障禁止重排序，synchronized通过happens-before规则保证有序性。三大特性是并发编程基础，很多并发问题因某个特性未被保证而产生。理解并正确使用volatile、synchronized、Lock等机制是编写正确并发程序的关键。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是JMM（Java内存模型）？",
+    "keywords": "主内存与工作内存、happens-before",
+    "answer": "JMM是Java定义的一套规范，屏蔽不同硬件和操作系统的内存访问差异。将内存分为主内存（所有线程共享，存放共享变量）和工作内存（每个线程私有，主内存的副本缓存）。线程对变量的所有操作都在工作内存中进行，不能直接读写主内存。JMM定义了八种原子操作：lock、unlock、read、load、use、assign、store、write。happens-before规则是JMM核心概念，包括程序顺序规则、锁的happens-before、volatile变量规则、线程启动和终止规则、传递性规则等。通过这些规则保证多线程环境下程序执行的正确性，程序员只需遵循规则无需关心底层硬件差异。JSR-133规范在JDK1.5中完善了JMM的定义。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是CAS？有什么问题？",
+    "keywords": "比较并交换、ABA问题、自旋开销",
+    "answer": "CAS即比较并交换，是无锁的原子操作。包含三个操作数：内存值V、预期值A、新值B，当且仅当V等于A时将V更新为B，否则不做操作。CAS由CPU原子指令（如x86的cmpxchg）实现。Java中java.util.concurrent.atomic包下的AtomicInteger、AtomicLong等基于CAS实现。CAS存在的问题：第一，ABA问题，线程1读取值A，线程2将其改为B再改回A，线程1执行CAS发现仍为A认为没被修改过，可通过AtomicStampedReference加版本号解决。第二，自旋开销，CAS失败后不断自旋重试，高竞争场景下浪费CPU。第三，只能保证单个变量的原子操作，多变量需要加锁或使用AtomicReference。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "Synchronized和ReentrantLock有什么区别？",
+    "keywords": "锁升级、可中断、公平锁、条件变量",
+    "answer": "Synchronized是JVM内置关键字，通过monitorenter和monitorexit字节码实现，1.6后引入偏向锁、轻量级锁、重量级锁的升级机制。ReentrantLock是java.util.concurrent.locks包下的类，基于AQS实现。主要区别：第一，Synchronized自动释放锁，ReentrantLock必须手动释放（try-finally）。第二，ReentrantLock支持可中断等待（lockInterruptibly）、超时获取（tryLock）。第三，ReentrantLock支持公平锁和非公平锁，Synchronized只有非公平锁。第四，ReentrantLock支持多个Condition条件变量，可精确唤醒特定等待队列的线程，Synchronized只有单一的wait和notify机制。第五，Synchronized在JVM层面优化，JIT编译后性能可能更好。一般优先使用Synchronized，需要高级功能时用ReentrantLock。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "Synchronized的底层实现原理是什么？",
+    "keywords": "Monitor、锁升级、对象头",
+    "answer": "Synchronized基于Monitor（监视器锁）实现，每个Java对象头中都有Mark Word存储锁信息。代码块同步通过monitorenter和monitorexit指令实现，方法同步通过ACC_SYNCHRONIZED标志实现。锁升级过程：无锁状态到偏向锁（Mark Word存储线程ID，单线程访问时使用）到轻量级锁（CAS自旋竞争，适合线程交替执行）到重量级锁（OS的mutex lock，适合高竞争场景）。偏向锁通过CAS将线程ID记录到Mark Word，后续只需比较线程ID即可进入同步块。轻量级锁通过CAS将Mark Word复制到线程栈帧的Lock Record中。重量级锁通过ObjectMonitor实现，包含owner、entryList（阻塞队列）和waitSet（等待队列）。锁只能升级不能降级。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是AQS（抽象队列同步器）？",
+    "keywords": "state变量、CLH队列、模板方法",
+    "answer": "AQS是Java并发包的基石，ReentrantLock、Semaphore、CountDownLatch等都基于它实现。核心思想：维护volatile int state变量表示锁状态，以及CLH变体的双向链表队列存放等待线程。获取锁时通过CAS修改state，失败则封装为Node节点加入CLH队列并自旋或park阻塞。释放锁时修改state并唤醒后继节点。AQS采用模板方法模式，子类需重写tryAcquire和tryRelease（独占模式）或tryAcquireShared和tryReleaseShared（共享模式）。独占模式：ReentrantLock中state表示重入次数。共享模式：Semaphore中state表示可用许可数；CountDownLatch中state表示计数器。Condition条件变量通过维护conditionWaiter链表实现精确唤醒。理解AQS是深入理解Java并发的关键。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是死锁？如何预防和避免？",
+    "keywords": "四个必要条件、预防策略、检测与恢复",
+    "answer": "死锁是两个或多个线程互相持有对方所需资源而无法继续执行的状态。四个必要条件：互斥条件（资源只能被一个线程持有）、占有并等待（持有资源的线程等待其他资源）、不可剥夺（已获得的资源不能被强制释放）、循环等待（线程之间形成资源等待环）。预防策略：破坏占有并等待（一次性申请所有资源）、破坏不可剥夺（允许抢占）、破坏循环等待（按固定顺序申请资源）。避免死锁：银行家算法在资源分配前判断系统是否安全。检测与恢复：使用jstack或ThreadMXBean检测死锁线程然后终止或回滚。Java中可使用tryLock设置超时避免无限等待，按固定顺序加锁是常见实践。死锁排查工具包括jstack、jconsole、VisualVM等。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "volatile关键字的作用和底层原理？",
+    "keywords": "可见性、有序性、内存屏障",
+    "answer": "volatile保证变量的可见性和有序性但不保证原子性。可见性：volatile变量被修改后立即刷新到主内存，读取时直接从主内存获取。底层通过内存屏障实现：写操作后插入StoreLoad屏障强制刷回主内存；读操作前插入LoadLoad屏障强制从主内存重新加载。有序性：volatile禁止指令重排序，经典案例是DCL（双重检查锁定）单例模式中必须使用volatile修饰instance变量，防止new对象时的指令重排导致其他线程获取到未初始化的对象。volatile的典型使用场景：状态标志位（如停止线程的running标志）、DCL单例、happens-before传递性保证的复合操作。volatile不能替代synchronized，i++这类复合操作仍需加锁。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "线程池的核心线程数可以动态修改吗？",
+    "keywords": "setCorePoolSize、动态调整",
+    "answer": "线程池的核心线程数可通过setCorePoolSize()方法动态修改。传入值与当前核心线程数比较：新值大于当前值则创建新核心线程处理任务队列中的等待任务；新值小于当前值则多余线程在下次空闲时通过processWorkerExit终止。设置核心线程数为0不会立即终止所有核心线程，需要调用allowCoreThreadTimeOut(true)让核心线程在超时后也能被回收。实际应用中可根据系统负载动态调整线程池参数，如高峰期增大核心线程数，低谷期减小。也可配合prestartAllCoreThreads()预启动所有核心线程减少任务提交时的延迟。美团等公司基于这些API实现了运行时参数调整的动态线程池框架。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "线程池有哪些拒绝策略？分别什么场景？",
+    "keywords": "AbortPolicy、CallerRunsPolicy等",
+    "answer": "线程池有四种内置拒绝策略，当线程池和队列都满时触发。AbortPolicy（默认）：直接抛出RejectedExecutionException异常，适用于不允许任务丢失的场景，调用方需自行处理异常。CallerRunsPolicy：由提交任务的线程自己执行该任务，起到降级和限流作用，适用于不丢弃任务且能承受延迟的场景。DiscardPolicy：静默丢弃任务不抛异常，适用于对任务丢失不敏感的场景。DiscardOldestPolicy：丢弃队列中最老的任务然后重新尝试提交当前任务，适用于允许丢失旧任务的场景。此外可实现RejectedExecutionHandler接口自定义拒绝策略，如将被拒绝的任务持久化到磁盘、发送告警通知、记录到数据库等。选择拒绝策略应根据业务对任务丢失的容忍度来决定。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "线程池的核心线程数和最大线程数怎么设置？",
+    "keywords": "CPU密集型、IO密集型、公式",
+    "answer": "线程数设置需根据任务类型区分。CPU密集型任务（大量计算）：核心线程数等于CPU核数加1，避免过多线程上下文切换开销。IO密集型任务（大量等待IO）：核心线程数等于CPU核数乘以2或CPU核数除以(1减阻塞系数)，因为IO等待时CPU空闲可运行更多线程。实际项目经验公式：核心线程数等于CPU核数乘以目标CPU利用率乘以(1加等待时间除以计算时间)。还可以通过压测确定最优线程数：从CPU核数开始逐步增加线程数，观察吞吐量和响应时间变化，吞吐量不再提升时即为最优值。监控指标包括活跃线程数、队列大小、任务完成数、拒绝任务数。建议为不同业务创建不同线程池避免相互影响。可使用JVM参数或Arthas等工具监控线程池运行状态。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "Java中有哪些并发工具类？",
+    "keywords": "CountDownLatch、CyclicBarrier、Semaphore等",
+    "answer": "java.util.concurrent提供了丰富的并发工具类。CountDownLatch基于AQS共享模式的计数器，countDown()递减计数，await()等待计数归零，用于一个或多个线程等待其他线程完成。CyclicBarrier基于ReentrantLock和Condition，所有线程到达屏障点后一起放行，可重用，适用于多线程分阶段计算。Semaphore基于AQS共享模式，控制并发访问线程数量，acquire()获取许可，release()释放许可，适用于资源池和限流。Phaser是分阶段同步器，比CyclicBarrier更灵活，支持动态注册参与者。Exchanger实现线程间交换数据的同步点。CompletableFuture支持异步编程链式调用、组合操作和异常处理。ConcurrentHashMap、ConcurrentLinkedQueue等并发容器也是常用工具。使用时应选择合适的工具避免过度复杂化同步逻辑。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "JDK对锁做了哪些优化？",
+    "keywords": "偏向锁、轻量级锁、锁消除、锁粗化",
+    "answer": "JDK1.6对synchronized引入多种优化。偏向锁：在Mark Word中记录线程ID，同一线程再次进入时只需比较线程ID无需CAS，适合单线程访问场景。轻量级锁：通过CAS将Mark Word替换为指向Lock Record的指针，适用于线程交替执行无竞争的场景。重量级锁通过ObjectMonitor实现使用OS的mutex lock。锁消除：JIT编译器通过逃逸分析发现锁对象不可能被其他线程访问时自动消除锁操作。锁粗化：当JIT发现一系列连续加锁解锁操作针对同一对象时扩大锁范围减少加锁解锁次数。自适应自旋锁：根据上次自旋结果自动调整自旋次数避免浪费CPU。这些优化使synchronized在不同竞争程度下都能保持较好性能。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "创建线程有哪几种方式？",
+    "keywords": "Thread、Runnable、Callable、线程池",
+    "answer": "Java创建线程主要有四种方式。继承Thread类并重写run()方法，创建实例后调用start()启动，但Java单继承限制扩展性。实现Runnable接口并重写run()，通过new Thread(runnable).start()启动，解耦任务和线程更灵活推荐使用。实现Callable接口并重写call()方法，配合FutureTask和Thread使用，可获取执行结果和异常。使用线程池ExecutorService，通过ThreadPoolExecutor或Executors工厂方法创建，这是生产环境推荐方式，可复用线程、控制并发数、管理线程生命周期。此外有ForkJoinPool用于分治任务、CompletableFuture用于异步编程。不推荐直接new Thread因为无法复用、无法控制线程数量、频繁创建销毁开销大。start()方法才真正创建新线程，直接调用run()只是在当前线程执行。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "final关键字在并发编程中的可见性保证？",
+    "keywords": "final域语义、构造器逸出",
+    "answer": "final关键字在并发编程中提供特殊的内存语义保证。根据JMM的final语义：构造函数中对final字段的写入操作happens-before于另一个线程对该对象对应字段的读取。具体来说，写final域之前插入StoreStore屏障，之后插入StoreLoad屏障，确保构造器中对final字段的初始化对其他线程可见。这保证了即使对象引用被发布到其他线程，也能看到final字段的正确初始化值。需注意如果在构造器中this引用发生逸出（如将this赋给可被其他线程访问的字段），则final语义被破坏。这也是Effective Java推荐在构造器中不要让this逸出的原因。final的这种保证在JDK1.5+才完整实现。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是CAS中的ABA问题？如何解决？",
+    "keywords": "AtomicStampedReference、版本号机制",
+    "answer": "ABA问题是指线程1读取变量值为A，线程2将值从A改为B再改回A，线程1执行CAS时发现仍为A认为没有被修改过，但实际上已经历两次修改。虽然大多数场景下ABA不影响结果（值最终正确），但在链表节点删除等场景下会有问题。解决方案：使用AtomicStampedReference维护引用值和版本号，每次修改增加版本号，CAS时同时比较引用和版本号。AtomicMarkableReference维护引用值和布尔标记适用于不需要精确版本号的场景。也可使用version字段实现乐观锁每次更新version加一。ABA问题在无锁数据结构（无锁栈、无锁队列）中需特别注意。如果业务逻辑只关心最终值正确通常可忽略ABA问题。"
+  },
+  {
+    "category": "Java 并发",
+    "question": "什么是线程的生命周期？",
+    "keywords": "6种状态、NEW到TERMINATED",
+    "answer": "Java线程有6种生命周期状态，定义在Thread.State枚举中。NEW（新建）：线程对象已创建但尚未调用start()方法。RUNNABLE（可运行）：调用start()后进入此状态，包含就绪和运行两个子状态。在JVM层面是就绪状态等待CPU调度，在操作系统层面可能已在运行。BLOCKED（阻塞）：等待获取synchronized锁时进入此状态，锁被其他线程持有时线程阻塞。WAITING（等待）：调用Object.wait()、Thread.join()、LockSupport.park()后进入，需要被显式唤醒。TIMED_WAITING（超时等待）：调用带超时参数的方法如Thread.sleep()、Object.wait(timeout)、Thread.join(timeout)后进入，超时后自动回到RUNNABLE。TERMINATED（终止）：run()方法执行完毕或因异常退出后进入此状态。状态转换：NEW到RUNNABLE（start），RUNNABLE到BLOCKED（等待锁），RUNNABLE到WAITING（wait/join/park），WAITING到RUNNABLE（notify/unpark），RUNNABLE到TERMINATED（执行完毕）。"
+  },
+  {
+    "category": "JVM",
+    "question": "JVM由哪些部分组成？",
+    "keywords": "类加载器、运行时数据区、执行引擎",
+    "answer": "JVM主要由三大部分组成。类加载器子系统负责将class文件加载到内存，包括Bootstrap ClassLoader（加载rt.jar等核心类库）、Extension ClassLoader（加载ext目录）、Application ClassLoader（加载classpath），采用双亲委派模型。运行时数据区包括方法区（存储类信息、常量、静态变量）、堆（对象实例分配区域）、虚拟机栈（线程私有，存储栈帧含局部变量表、操作数栈、动态链接、返回地址）、本地方法栈（为Native方法服务）、程序计数器（记录当前字节码行号）。执行引擎包括解释器（逐行解释字节码）、JIT编译器（将热点代码编译为本地代码提高效率）、垃圾回收器（自动回收内存）。还有本地方法接口（JNI）和本地方法库。"
+  },
+  {
+    "category": "JVM",
+    "question": "永久代和元空间有什么区别？",
+    "keywords": "PermGen到Metaspace、内存位置、大小限制",
+    "answer": "永久代是JDK7及之前的实现，元空间是JDK8引入的替代方案。主要区别：内存位置，永久代在JVM堆内存中，元空间使用本地内存不受JVM堆大小限制。大小控制，永久代通过-XX:PermSize和-XX:MaxPermSize设置容易OOM；元空间通过-XX:MetaspaceSize和-XX:MaxMetaspaceSize设置，默认不限制大小直到本地内存耗尽。字符串常量池JDK7已从永久代移到堆中。永久代GC效率低需要Full GC才能回收；元空间与堆GC配合更高效。元空间默认开启压缩指针节省内存。迁移建议：JDK8+项目应关注元空间使用情况设置合理的MaxMetaspaceSize防止本地内存泄漏，监控Metaspace使用量避免无限增长。"
+  },
+  {
+    "category": "JVM",
+    "question": "JVM内存区域划分为哪些？各自作用？",
+    "keywords": "堆、栈、方法区、程序计数器",
+    "answer": "JVM运行时数据区分为线程共享和线程私有两类。线程共享：堆是最大内存区域，所有对象实例和数组都在堆上分配，分为新生代（Eden+Survivor0+Survivor1）和老年代，是GC主要区域。方法区（JDK8+为Metaspace）存储类的元信息、常量池、静态变量、JIT编译后的代码。线程私有：虚拟机栈为每个线程创建，每个方法执行创建栈帧包含局部变量表、操作数栈、动态链接、方法返回地址。本地方法栈为Native方法服务。程序计数器是唯一不会OOM的区域记录当前线程执行的字节码行号。直接内存不属于JVM运行时数据区，NIO的DirectByteBuffer分配在此受-XX:MaxDirectMemorySize控制。理解内存区域对排查内存问题至关重要。"
+  },
+  {
+    "category": "JVM",
+    "question": "GC调优的核心目标是什么？",
+    "keywords": "吞吐量、停顿时间、内存占用",
+    "answer": "GC调优核心目标有三个需要权衡。吞吐量：CPU运行用户代码时间除以(CPU运行用户代码时间加GC时间)，目标最大化吞吐量适用于后台计算型应用，可用-XX:GCTimeRatio调整。最大停顿时间：每次GC造成的应用暂停时间，目标控制在可接受范围内（如50ms），适用于交互式应用，可用-XX:MaxGCPauseMillis设置。内存占用：GC后存活对象占用的内存大小影响GC频率。调优步骤：首先分析业务场景确定优先目标；通过GC日志和监控工具（jstat、GCViewer、GCEasy）分析当前GC表现；选择合适的垃圾收集器（低延迟选G1或ZGC）；调整JVM参数（堆大小、新生代比例等）。调优的最终目的是在满足业务需求前提下实现最优GC性能。"
+  },
+  {
+    "category": "JVM",
+    "question": "常见的垃圾收集器有哪些？各自特点？",
+    "keywords": "Serial、Parallel、CMS、G1、ZGC",
+    "answer": "Serial单线程收集简单高效，Client模式默认适合单核或小内存。ParNew是Serial多线程版本配合CMS使用。Parallel Scavenge和Parallel Old关注吞吐量是JDK8默认收集器。CMS以最小停顿为目标并发标记和清除但产生内存碎片，JDK14已移除。G1是JDK9默认将堆分为等大Region兼顾吞吐和低停顿，支持可预测的停顿时间模型，通过Remembered Set跟踪Region间引用，Mixed GC回收价值最大的Region。ZGC是JDK11引入停顿时间不超过10ms支持TB级堆内存，通过着色指针和读屏障实现几乎完全并发的GC。Shenandoah由RedHat开发与ZGC类似的低延迟目标。选择建议：小堆Serial或Parallel，中大堆G1，超大堆或低延迟要求ZGC。"
+  },
+  {
+    "category": "JVM",
+    "question": "常见的GC算法有哪些？",
+    "keywords": "标记-清除、标记-复制、标记-整理",
+    "answer": "标记-清除分为标记和清除两个阶段，先标记所有可达对象再清除未标记对象，优点是简单缺点是产生内存碎片且效率不稳定，CMS的并发清除阶段使用此算法。标记-复制将内存分为两块每次只使用一块，GC时将存活对象复制到另一块然后清空当前块，新生代使用改良的复制算法8:1:1比例减少空间浪费，优点无碎片效率高缺点空间利用率低。标记-整理标记所有存活对象然后向一端移动清除边界外内存，老年代使用此算法如Parallel Old，无碎片但移动对象成本高。分代收集根据对象生命周期将堆分为新生代和老年代分别使用合适的算法。增量收集和分区收集是进一步的优化策略。"
+  },
+  {
+    "category": "JVM",
+    "question": "常用的JVM参数有哪些？",
+    "keywords": "堆内存、GC日志、元空间、栈大小",
+    "answer": "堆内存相关：-Xms（初始堆大小）、-Xmx（最大堆大小建议设为相同避免动态扩展）、-Xmn（新生代大小）、-XX:NewRatio（老年代:新生代比例默认2）、-XX:SurvivorRatio（Eden:Survivor比例默认8）。元空间：-XX:MetaspaceSize、-XX:MaxMetaspaceSize。线程栈：-Xss（每个线程栈大小默认1MB）。GC日志：-Xlog:gc*（JDK9+统一日志框架）。GC选择：-XX:+UseG1GC、-XX:+UseZGC。性能调优：-XX:MaxGCPauseMillis=200、-XX:ParallelGCThreads=8。OOM排查：-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/path。直接内存：-XX:MaxDirectMemorySize。常用排查命令：jps（查看进程）、jstack（线程快照）、jmap（堆转储）、jstat（GC统计）、jinfo（查看参数）。这些参数可通过jinfo -flags pid动态查看。"
+  },
+  {
+    "category": "JVM",
+    "question": "如何进行JVM GC调优？",
+    "keywords": "分析工具、调优步骤、参数调整",
+    "answer": "JVM GC调优系统化流程：建立性能基线通过压测获取吞吐量、响应时间、GC频率和停顿时间等指标。选择合适的垃圾收集器，低延迟选G1/ZGC，高吞吐选Parallel，小堆选Serial。设置初始参数将-XX:MetaspaceSize设为256M，-Xms和-Xmx设为相同值。开启GC日志并用GCViewer或GCEasy分析，关注GC频率、停顿时间、堆内存变化趋势。根据分析结果调整参数如新生代大小、G1目标停顿时间。循环迭代优化。常用工具：jstat实时监控GC、VisualVM可视化监控、Arthas在线诊断、Eclipse MAT堆转储分析。调优原则：不要过度优化先解决最明显的问题；监控先行数据驱动决策；理解应用特征比盲目调参更重要。"
+  },
+  {
+    "category": "JVM",
+    "question": "OOM的常见情况有哪些？如何排查？",
+    "keywords": "堆溢出、栈溢出、元空间溢出、直接内存",
+    "answer": "OOM常见类型及排查方法。Java heap space堆内存不足，可能原因包括内存泄漏（集合无限增长、未关闭的资源）、大对象分配、堆设置过小，通过-XX:+HeapDumpOnOutOfMemoryError生成堆转储文件用MAT分析。Metaspace类元数据区满，可能原因包括动态代理过多、CGLIB生成大量类，增大-XX:MaxMetaspaceSize或排查类加载泄漏。GC overhead limit exceeded GC时间占比超98%但回收不到2%内存通常意味内存泄漏。Direct buffer memory NIO直接内存不足增大-XX:MaxDirectMemorySize。StackOverflowError栈深度超过限制增大-Xss或优化递归。Unable to create new native thread操作系统无法创建更多线程检查ulimit -u限制。排查工具链：jps到jmap到MAT，Arthas heapdump，jstack检查线程。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是MySQL的最左前缀原则？",
+    "keywords": "联合索引、匹配规则",
+    "answer": "最左前缀原则是MySQL联合索引的核心使用规则。创建联合索引INDEX(a,b,c)时B+树按a、b、c顺序排序。查询必须从最左列开始匹配，跳过中间列导致后续列无法使用索引。WHERE a=1可使用索引；WHERE a=1 AND b=2可使用；WHERE a=1 AND b=2 AND c=3使用全部索引。但WHERE b=2无法使用（跳过a）；WHERE a=1 AND c=3只能使用a列。MySQL 8.0引入索引跳跃扫描在某些场景下可突破限制。ORDER BY和GROUP BY同样遵循此原则。范围查询（大于、小于、BETWEEN、LIKE开头不为%）使后续列无法使用索引。理解最左前缀原则对合理设计联合索引和优化查询至关重要，应将查询频率最高的列放在索引最前面。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是脏读、不可重复读和幻读？",
+    "keywords": "三种读异常、隔离级别对应",
+    "answer": "脏读：事务A读取了事务B修改但尚未提交的数据，如果B回滚A读到的就是无效数据。不可重复读：事务A两次读取同一数据中间被B修改并提交导致两次读取结果不同，重点是数据被修改（UPDATE）。幻读：事务A两次查询返回行数不同中间被B插入或删除数据并提交，重点是行数变化（INSERT和DELETE）像幻觉一样。三者区别：脏读是读到未提交数据；不可重复读是同一行数据的值变了；幻读是结果集行数变了。MySQL通过四种隔离级别不同程度地解决这些问题。默认可重复读通过MVCC解决脏读和不可重复读，InnoDB通过间隙锁和临键锁在一定程度上解决幻读。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL有哪些存储引擎？InnoDB有什么优势？",
+    "keywords": "InnoDB vs MyISAM",
+    "answer": "MySQL支持多种存储引擎，常用InnoDB和MyISAM。InnoDB（MySQL 5.5+默认）支持事务ACID、行级锁、外键，采用聚簇索引组织数据，支持MVCC实现高并发，通过redo log保证崩溃恢复，使用undo log支持事务回滚，适合高并发读写、数据一致性要求高的场景。MyISAM不支持事务和行级锁（只有表级锁）不支持外键，采用非聚簇索引，读性能好但写性能差，适合读多写少无事务要求的场景。其他引擎：Memory将数据存在内存中断电丢失适合临时表；Archive只支持INSERT和SELECT适合日志归档；CSV以CSV格式存储方便导入导出。选择建议：绝大多数场景使用InnoDB除非有特殊需求。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是覆盖索引？有什么好处？",
+    "keywords": "索引覆盖查询、减少回表",
+    "answer": "覆盖索引是查询所需的所有列都包含在索引中无需回表查询主键索引。例如索引INDEX(name, age)执行SELECT name, age FROM user WHERE name等于某值时只需扫描二级索引就能获取所有数据无需回表。好处：减少IO操作避免回表时的随机IO；减少内存占用二级索引通常比聚簇索引小；提升查询性能大数据量下效果显著；避免回表时的锁竞争。EXPLAIN中Extra列显示Using index表示使用了覆盖索引。实践中应尽量让高频查询命中覆盖索引，通过创建合适的联合索引实现。使用SELECT *会破坏覆盖索引因为不可能所有列都在索引中，这也是不推荐SELECT *的原因之一。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL有哪些索引类型？",
+    "keywords": "B+树、Hash、全文、空间索引",
+    "answer": "MySQL索引按数据结构分为：B+树索引（默认最常用）所有数据存储在叶子节点，叶子节点通过双向链表连接支持范围查询和排序。Hash索引（MEMORY引擎支持）等值查询O(1)但不支持范围查询和排序。全文索引FULLTEXT用于文本搜索InnoDB 5.6+支持基于倒排索引实现。空间索引SPATIAL用于GIS数据支持几何数据类型。按功能分类：主键索引PRIMARY KEY唯一标识每行非空唯一。唯一索引UNIQUE列值唯一但允许NULL。普通索引INDEX最基本的索引无唯一性约束。联合索引在多列上创建遵循最左前缀原则。前缀索引对字符串列前N个字符创建索引节省空间但不能用于ORDER BY和覆盖索引。选择索引类型应根据查询模式和数据特征决定。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是索引下推（ICP）？",
+    "keywords": "Index Condition Pushdown、减少回表",
+    "answer": "索引下推是MySQL 5.6引入的查询优化策略。传统方式存储引擎根据索引找到记录后直接返回给Server层再进行WHERE条件过滤。开启ICP后存储引擎在索引层面直接进行WHERE条件过滤只返回满足条件的记录减少回表次数和Server层数据处理量。例如索引INDEX(name, age)查询WHERE name LIKE和age等于某值，传统方式先找到所有name匹配的记录全部回表再在Server层过滤age；ICP方式在存储引擎层直接过滤age只有满足条件的记录才回表。EXPLAIN中Extra列显示Using index condition表示使用了ICP。ICP只能用于InnoDB和MyISAM只能用于联合索引，WHERE条件需包含索引列和非索引列的组合条件。ICP显著减少了IO操作和回表次数。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "聚簇索引和非聚簇索引有什么区别？",
+    "keywords": "数据存储方式、主键索引、二级索引",
+    "answer": "聚簇索引数据和索引存储在一起叶子节点直接包含行数据。InnoDB中主键索引就是聚簇索引表数据按主键顺序物理存储。一张表只能有一个聚簇索引。优点：主键查询效率高一次索引查找获取数据；范围查询性能好叶子节点通过链表相连。缺点：插入性能受主键顺序影响（自增主键可避免页分裂）更新主键代价大。非聚簇索引也叫二级索引叶子节点存储主键值而非数据本身。查找时需先通过二级索引找到主键再通过主键在聚簇索引中找到数据即回表。一张表可以有多个二级索引。MyISAM的索引都是非聚簇索引数据和索引分离存储。设计建议：尽量使用自增主键避免页分裂；尽量使用覆盖索引减少回表。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是回表？如何减少回表？",
+    "keywords": "二级索引查找、主键查找",
+    "answer": "回表是通过二级索引查找到记录的主键后再根据主键到聚簇索引中查找完整行数据的过程。例如索引INDEX(name)执行SELECT * FROM user WHERE name等于某值，先在name索引B+树中找到匹配记录及其主键id，然后拿着id到主键索引查找完整行数据这就是回表。回表代价：额外的B+树查找增加IO开销。减少回表方法：使用覆盖索引让查询列全部包含在索引中；避免SELECT *只查需要的列；创建合适的联合索引将高频查询列包含进去；使用主键查询不需要回表；利用索引条件下推（ICP）减少回表数据量。设计表结构和索引时应充分考虑高频查询模式尽量减少回表。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "如何判断索引是否有效？",
+    "keywords": "EXPLAIN、执行计划、索引选择",
+    "answer": "使用EXPLAIN命令分析SQL执行计划判断索引是否有效。关键字段：type列（访问类型）从优到差system、const、eq_ref、ref、range、index、ALL，达到range及以上表示索引有效。key列实际使用的索引为NULL表示未使用。rows预估扫描行数越小越好。Extra列：Using index表示覆盖索引；Using index condition表示索引下推；Using temporary表示使用临时表通常需优化；Using filesort表示文件排序未利用索引排序。索引失效常见情况：对索引列使用函数或运算；隐式类型转换；LIKE以%开头；OR条件中有非索引列。优化思路：分析慢查询日志使用EXPLAIN查看执行计划针对性创建或调整索引。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "B+树是如何进行查询的？",
+    "keywords": "树高、叶子节点、范围查询",
+    "answer": "B+树查询从根节点开始逐层向下查找。每一层节点是一个数据页（通常16KB），每个数据页内存储多个键值和指针。查询时将目标键值与节点中键值进行二分查找确定需要进入的子节点指针直到到达叶子节点。叶子节点通过双向链表连接包含实际数据或指向数据的指针。等值查询：从根到叶的路径时间复杂度O(log n)通常3-4层即可存储千万级数据。范围查询：先通过等值查询定位起始叶子节点然后沿链表顺序扫描到结束位置。B+树优势：所有数据都在叶子节点查询路径长度一致性能稳定；叶子节点链表连接范围查询高效；非叶子节点只存键值和指针可以存储更多索引项降低树高减少IO次数。InnoDB中B+树扇出通常在几百，3层约能存储2000万条记录。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "为什么MySQL选择B+树而不是B树？",
+    "keywords": "磁盘IO、范围查询、数据存储",
+    "answer": "B+树相比B树更适合MySQL的原因：磁盘IO更少，B+树非叶子节点只存储键值和指针不存储数据，单个数据页可以容纳更多索引项树更矮胖查询需要的磁盘IO次数更少。范围查询更高效，B+树叶子节点通过双向链表连接范围查询只需定位起始位置后顺序扫描，B树需要中序遍历效率较低。查询性能更稳定，B+树所有数据都在叶子节点每次查询都需走到叶子层路径长度一致。排序和分组更方便叶子节点天然有序且相连。B+树扇出更大IO次数更少且稳定。综合来看B+树完美适配磁盘存储特性：减少磁盘IO、优化范围查询、保持查询性能稳定。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "三层B+树大约能存储多少数据？",
+    "keywords": "页大小、指针数、扇出",
+    "answer": "InnoDB中B+树三层可存储的数据量计算：默认页大小16KB，主键使用bigint（8字节），指针6字节，每个键值对约14字节。每个非叶子节点页可存储索引项数量约等于16KB除以14B约等于1170个。第一层（根节点）约1170个指针指向第二层。第二层每个节点又有1170个指针指向第三层共1170乘1170约等于1,368,900个指针。第三层（叶子节点）每个叶子节点存储约16条记录（假设每条记录1KB）共1,368,900乘16约等于21,902,400条记录。因此三层B+树大约可存储2000万条数据。这解释了为什么很多互联网公司建议单表数据超过2000万时需要分库分表。如果是联合索引或更小的行存储量会有所不同，实际存储量取决于主键大小和行数据大小。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "SQL在MySQL中的执行过程是怎样的？",
+    "keywords": "连接器、解析器、优化器、执行器",
+    "answer": "SQL执行完整流程：连接器建立TCP连接验证用户名密码获取权限信息。查询缓存（MySQL 8.0已移除）检查是否有相同SQL的缓存结果。解析器进行词法分析（将SQL字符串拆分为Token）和语法分析（检查SQL语法生成解析树）。预处理阶段进行权限校验和语义分析。优化器根据表统计信息和索引信息选择最优执行计划包括选择使用哪个索引、多表连接顺序等。执行器首先检查表访问权限然后调用存储引擎接口执行查询。InnoDB通过Buffer Pool管理数据页先在缓冲池中查找数据未命中则从磁盘加载。最后将结果集返回给客户端。整个过程涉及查询解析、权限验证、查询优化和数据访问等多个阶段。理解这个过程有助于定位性能瓶颈。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL事务的实现原理是什么？",
+    "keywords": "ACID、redo log、undo log",
+    "answer": "MySQL事务基于InnoDB的ACID实现。原子性通过undo log实现，事务执行前将原始数据写入undo log回滚时恢复数据。一致性由AID共同保证是事务的最终目标。隔离性通过锁和MVCC实现，锁机制保证并发事务互不干扰，MVCC通过ReadView和版本链实现无锁读。持久性通过redo log实现采用WAL机制，事务提交前先将修改记录到redo log即使崩溃也能通过redo log恢复已提交数据。redo log采用循环写入方式通过checkpoint机制标记已刷盘的日志位置。事务执行过程：BEGIN、修改数据（写undo log和redo log）、COMMIT（redo log刷盘）、后台线程异步刷脏页。两阶段提交保证redo log和binlog的一致性。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是MVCC？它是如何工作的？",
+    "keywords": "多版本并发控制、ReadView、版本链",
+    "answer": "MVCC即多版本并发控制是InnoDB实现高并发的核心机制。通过保存数据的多个版本读操作不需要加锁就能实现一致性读。每行数据有两个隐藏列：trx_id（最后修改该行的事务ID）和roll_pointer（指向undo log中该行的前一个版本形成版本链）。ReadView包含：m_ids（活跃事务ID列表）、min_trx_id（最小活跃事务ID）、max_trx_id（下一个要分配的事务ID）、creator_trx_id（创建该ReadView的事务ID）。可见性判断规则：trx_id等于creator_trx_id则可见；trx_id小于min_trx_id则可见（已提交）；trx_id大于等于max_trx_id则不可见（未来事务）；在m_ids中则不可见（未提交）否则可见。RC级别每次SELECT创建新ReadView，RR级别只在第一次SELECT时创建，这是两者的关键区别。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL的默认隔离级别是什么？为什么？",
+    "keywords": "可重复读、平衡性能与一致性",
+    "answer": "MySQL InnoDB默认隔离级别是可重复读（Repeatable Read，RR）。选择RR是因为它在性能和一致性之间取得良好平衡：通过MVCC实现同事务内多次读取同一数据返回相同结果，解决脏读和不可重复读。InnoDB在RR级别下通过间隙锁和临键锁在很大程度上避免了幻读。RR相比RC的优点：事务内查询结果一致便于业务逻辑编写；减少锁争用。相比Serializable优点：读操作不加锁保留并发性能。MySQL不选RC作为默认是因为RR在大多数场景下能提供更强的一致性保证而性能损失可接受。可通过SET TRANSACTION ISOLATION LEVEL修改隔离级别。互联网公司中不少选择RC级别因为避免了长时间持有锁。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL有哪些隔离级别？分别解决什么问题？",
+    "keywords": "读未提交、读已提交、可重复读、串行化",
+    "answer": "MySQL定义四种事务隔离级别。读未提交最低级别，事务可以读取其他事务未提交的数据存在脏读、不可重复读、幻读，实际使用很少。读已提交只能读取已提交数据解决脏读，每次SELECT创建新ReadView，是Oracle默认也是很多互联网公司选择，避免长时间持有锁。可重复读MySQL默认，同事务内多次读取结果一致解决脏读和不可重复读，第一次SELECT时创建ReadView整个事务复用，通过MVCC加间隙锁很大程度解决幻读。串行化最高级别强制串行执行读加共享锁写加排他锁完全解决所有并发问题但性能最差。选择建议：大多数场景用RR，对并发要求极高且能接受读最新已提交数据用RC。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "如何进行SQL调优？",
+    "keywords": "慢查询、EXPLAIN、索引优化",
+    "answer": "SQL调优系统化流程：定位慢查询，开启慢查询日志slow_query_log=ON设置long_query_time=1，使用mysqldumpslow或pt-query-digest分析。使用EXPLAIN分析执行计划关注type（访问类型）、key（使用索引）、rows（扫描行数）、Extra（额外信息）。常见优化策略：合理创建索引（覆盖索引、联合索引遵循最左前缀）；避免SELECT *只查需要的列；优化JOIN（小表驱动大表、被驱动表建索引）；避免在WHERE中对索引列使用函数或运算；使用LIMIT分页优化（延迟关联）；子查询改为JOIN。表结构优化：选择合适数据类型适当冗余减少JOIN合理分区。数据库配置优化：调整innodb_buffer_pool_size等参数。架构优化：读写分离、分库分表。调优是迭代过程需要持续监控和调整。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL中死锁是如何产生和解决的？",
+    "keywords": "锁等待、死锁检测、超时机制",
+    "answer": "MySQL死锁产生原因：两个或多个事务互相持有对方需要的锁。例如事务A锁定行1等待行2，事务B锁定行2等待行1。常见场景：不同事务以不同顺序操作相同资源；间隙锁与INSERT冲突；唯一索引插入时的锁竞争。InnoDB死锁处理：等待超时innodb_lock_wait_timeout默认50秒超时后自动回滚较小事务。死锁检测innodb_deadlock_detect=ON通过等待图检测发现死锁后选择回滚代价最小的事务。可通过SHOW ENGINE INNODB STATUS查看死锁信息。预防措施：按固定顺序访问表和行；尽量缩短事务持有锁时间；使用合理索引避免锁升级；大事务拆小事务；使用SELECT ... FOR UPDATE NOWAIT或SKIP LOCKED。排查工具：SHOW PROCESSLIST、performance_schema、InnoDB Monitor。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "如何解决MySQL深度分页问题？",
+    "keywords": "延迟关联、书签法、覆盖索引",
+    "answer": "深度分页指OFFSET值很大时如LIMIT 1000000, 10需扫描100万加10行再丢弃前100万行性能极差。解决方案：延迟关联先通过覆盖索引快速定位主键ID再回表获取完整数据，SQL：SELECT t.* FROM user t INNER JOIN (SELECT id FROM user ORDER BY id LIMIT 1000000, 10) tmp ON t.id = tmp.id。书签法（游标分页）记录上一页最后ID下一页使用WHERE id > lastId LIMIT 10避免OFFSET，适用于无限滚动场景。使用Elasticsearch的scroll或search_after处理深度分页。业务层面限制分页深度如Google搜索限制最多几十页。使用Redis缓存热门分页数据。分区表可减少单表扫描范围。选择方案需根据业务权衡，书签法最简单高效但不支持随机跳页。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL主从同步的原理是什么？",
+    "keywords": "binlog、relay log、三个线程",
+    "answer": "MySQL主从同步基于binlog实现包含三个关键线程。主库Binlog Dump Thread：主库写操作后将变更记录到binlog，从库连接时创建该线程负责将binlog事件发送给从库。从库IO Thread：接收主库发送的binlog事件写入本地relay log并记录已同步到的binlog位点。从库SQL Thread：读取relay log中的事件并重放将数据变更应用到从库。同步模式：异步复制（默认）主库提交后立即返回不等待从库确认性能最好但可能丢数据。半同步复制至少一个从库确认接收binlog后主库才返回平衡一致性和性能。全同步复制所有从库确认后才返回性能最差但数据最安全。binlog格式：Statement（记录SQL语句）、Row（记录行变更推荐）、Mixed。GTID复制简化主从切换和故障恢复。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "创建MySQL索引需要注意什么？",
+    "keywords": "选择性、最左前缀、避免过多索引",
+    "answer": "创建索引注意事项：选择性高的列优先（区分度大），可用SELECT COUNT(DISTINCT col)除以COUNT(*)计算选择性。联合索引遵循最左前缀原则将选择性高的列放前面。避免创建过多索引（建议单表不超5-6个）每个索引占存储空间且降低写入性能。更新频繁的列谨慎建索引。尽量使用覆盖索引将查询列包含在索引中。字符串列使用前缀索引时前缀长度根据选择性确定。利用索引merge优化MySQL可合并多个单列索引扫描结果。避免对大文本列创建索引。考虑索引对排序和分组的支持。在大表上创建索引使用Online DDL或pt-osc避免锁表影响业务。定期检查无用索引并删除使用sys.schema_unused_indexes分析。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么时候不应该建索引？",
+    "keywords": "写多读少、小表、低选择性",
+    "answer": "不适合建立索引的场景：写多读少的表索引会显著降低INSERT、UPDATE、DELETE性能因为每次写操作需维护索引。数据量很小的表（几百行）全表扫描比索引查找更快。选择性很低的列如性别字段只有两个值索引区分度差优化器通常忽略。频繁更新的列每次更新导致索引重建。已经有很多索引的表继续添加边际效益递减且维护成本增加。查询不涉及的列避免创建无用索引。数据分布均匀且无明显热点的场景。判断原则：先分析查询模式找出高频慢查询再针对性创建索引。通过慢查询日志、performance_schema和pt-query-digest分析。定期清理无用索引使用sys.schema_unused_indexes识别。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是分库分表？为什么需要？",
+    "keywords": "水平拆分、垂直拆分、数据量瓶颈",
+    "answer": "分库分表是将单个数据库或表拆分为多个库或表的架构方案。原因：单表数据量过大（超2000万行）导致查询性能下降、索引效率降低、DDL变更耗时；单库连接数和IO吞吐达到瓶颈；单机存储容量不足。垂直拆分按业务模块拆分（如用户库、订单库）解决耦合和资源争用。垂直分表将大字段拆到扩展表减少单行数据量。水平拆分按某个维度（如用户ID取模）将数据分散到多个库或表是解决数据量增长的主要手段。分片策略：Hash取模（均匀分布但扩容困难）、范围分片（便于扩容但可能热点）、一致性Hash。带来的问题：跨分片查询困难、分布式事务、全局唯一ID、数据迁移和扩容。通常配合ShardingSphere等中间件使用。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是二阶段提交（2PC）？",
+    "keywords": "协调者、准备阶段、提交阶段",
+    "answer": "二阶段提交是分布式事务的常用协议用于保证多个数据库节点的事务一致性。第一阶段（准备阶段）：事务协调者向所有参与者发送prepare请求，参与者执行本地事务但不提交将undo和redo log写入磁盘后回复yes或no。第二阶段（提交阶段）：所有参与者回复yes时协调者发送commit指令参与者提交事务；任一参与者回复no或超时时发送rollback指令参与者回滚。2PC的缺点：同步阻塞（参与者等待指令时一直持有锁）；协调者单点故障（宕机导致参与者阻塞）；数据不一致风险（第二阶段部分收到commit部分未收到）。改进方案：3PC引入超时机制；TCC在业务层面实现补偿；Saga将长事务拆为多个本地事务加补偿。Seata提供AT、TCC、Saga等多种模式。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "长事务有什么问题？如何避免？",
+    "keywords": "锁持有、日志膨胀、回滚代价",
+    "answer": "长事务指执行时间较长的事务持续数秒甚至数分钟。问题：持有锁时间过长阻塞其他事务降低并发性能；undo log膨胀长事务期间产生的大量undo log需保留到事务结束才能清理占用大量存储空间；回滚代价大需要恢复大量数据耗时很长；连接池资源被长期占用影响其他请求；可能导致主从复制延迟增大。避免措施：事务中避免RPC调用、HTTP请求等外部操作将事务控制在数据库操作范围内；避免在事务中进行大量计算和文件操作；批量操作分批提交；设置事务超时时间；监控长事务通过performance_schema或SELECT * FROM innodb_trx查找；异步化非核心操作将其移出事务。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是Seata？它有哪些模式？",
+    "keywords": "AT、TCC、Saga、XA",
+    "answer": "Seata是阿里巴巴开源的分布式事务解决方案提供多种模式。AT模式最常用，通过代理数据源拦截SQL自动生成before和after image实现自动回滚，对业务零侵入。流程：一阶段拦截SQL记录前镜像和后镜像到undo_log表，二阶段提交删除undo_log回滚时通过前镜像恢复数据。TCC模式在业务层面实现三个接口Try预留资源、Confirm确认提交、Cancel回滚释放，需要开发者手动编写补偿逻辑灵活但侵入性强。Saga模式将长事务拆为一系列本地事务Ti每个Ti有对应的补偿事务Ci正向失败时反向补偿适合长流程业务。XA模式基于数据库XA协议强一致性但性能较差。Seata的Server负责协调事务状态支持AT、TCC、Saga、XA四种模式。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "分库分表有哪些类型？",
+    "keywords": "垂直分库、垂直分表、水平分库、水平分表",
+    "answer": "分库分表分为四种类型。垂直分库按业务模块将不同表拆到不同数据库如用户相关放user_db订单相关放order_db，优点是业务解耦资源隔离降低单库压力，缺点是跨库JOIN困难。垂直分表将一张表中不常用字段或大字段（TEXT、BLOB）拆到另一张表通过主键关联，优点是减少单行数据量提升查询效率减少IO。水平分库将同一张表数据按分片键（如user_id）分散到多个数据库中。水平分表将同一张表数据按规则分散到同一数据库的多张表中如user拆为user_0到user_15。水平分库分表是解决数据量增长的主要手段。分片策略：Hash取模（均匀分布但扩容需数据迁移）、范围分片（按时间或ID范围便于扩容但可能热点）、一致性Hash（扩容时数据迁移量小）。常用中间件：ShardingSphere、MyCat。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是乐观锁和悲观锁？",
+    "keywords": "冲突处理策略、CAS、SELECT FOR UPDATE",
+    "answer": "乐观锁和悲观锁是处理并发冲突的两种策略。悲观锁：假设数据会被并发修改，操作前先加锁。MySQL中通过SELECT ... FOR UPDATE实现行级排他锁，事务提交或回滚后释放。适合写多读少、冲突频繁的场景。优点：数据安全性高。缺点：并发性能低，可能出现死锁。乐观锁：假设数据不会被并发修改，只在提交时检查冲突。通过版本号实现：UPDATE SET version=version+1 WHERE id=x AND version=old_version，更新失败则重试。通过CAS实现：比较当前值与预期值相同才更新。适合读多写少、冲突较少的场景。优点：并发性能高无锁开销。缺点：冲突频繁时重试次数多浪费资源。选择建议：读多写少用乐观锁，写多读少用悲观锁，需根据实际业务冲突概率决定。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL有哪些锁类型？",
+    "keywords": "表锁、行锁、间隙锁、临键锁",
+    "answer": "MySQL InnoDB支持多种锁类型。按粒度分：表锁锁整张表MyISAM使用，并发度低。行锁锁单行记录InnoDB支持，并发度高。页锁锁数据页BDB引擎使用。按类型分：共享锁（S锁）允许并发读。排他锁（X锁）独占修改。意向锁（IS/IX）表级别锁用于表锁和行锁的兼容性判断。行锁的实现：记录锁（Record Lock）锁定索引记录。间隙锁（Gap Lock）锁定索引记录之间的间隙防止幻读（RR级别）。临键锁（Next-Key Lock）等于记录锁加间隙锁是InnoDB默认的行锁算法。插入意向锁（Insert Intention Lock）INSERT操作在间隙中插入记录时使用。死锁相关：锁等待超时innodb_lock_wait_timeout。死锁检测innodb_deadlock_detect。加锁规则：在可重复读级别下加锁基于唯一索引和非唯一索引的不同行为。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "MySQL中count(*)、count(1)和count(id)有什么区别？",
+    "keywords": "执行效率、NULL值处理",
+    "answer": "count(*)统计表中所有行数包括NULL值。count(1)等价于count(*)，MySQL优化器会将其转换为count(*)处理。count(id)统计id列不为NULL的行数，如果id列有NOT NULL约束则与count(*)等价。执行效率：InnoDB中count(*)和count(1)性能基本一致，MySQL优化器会优先选择最小的索引来遍历计数。count(列名)需要检查该列的值是否为NULL，理论上略慢但差距极小。最佳实践：推荐使用count(*)或count(1)统计行数。count(列名)只统计该列非NULL的行数，如果列允许NULL且需要统计所有行应该用count(*)。注意：InnoDB的count()需要遍历索引无法通过缓存快速获取，如果只需要估算行数可以使用SHOW TABLE STATUS的Rows值（基于采样估计不精确）。精确计数如果对性能敏感可以使用额外的计数表或Redis原子计数器。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "一张表建多少个索引合适？",
+    "keywords": "索引数量、写入开销、维护成本",
+    "answer": "索引数量没有固定标准需要权衡查询性能和写入开销。一般建议单表索引不超过5到6个（包含主键）。考虑因素：索引对写入的影响：每次INSERT、UPDATE、DELETE都需要维护索引B+树，索引越多写入开销越大。索引占用空间：每个索引都是一棵B+树，大量索引占用磁盘和内存空间。索引维护成本：DDL操作（ALTER TABLE）在有大量索引时更耗时。优化器开销：过多索引增加查询优化器选择执行计划的计算开销。判断标准：分析慢查询日志找出需要优化的查询。检查每个索引是否被实际使用（sys.schema_unused_indexes）。评估索引对查询性能的提升是否值得写入性能的损失。定期清理：使用sys.schema_unused_indexes查找未使用的索引并删除。合并功能相似的联合索引。注意：主键和唯一索引不受上述限制，应根据业务需要创建。"
+  },
+  {
+    "category": "MySQL & 数据库",
+    "question": "什么是死锁？MySQL中如何解决？",
+    "keywords": "死锁检测、回滚、预防",
+    "answer": "死锁是两个或多个事务互相持有对方所需的锁资源而无法继续执行的状态。MySQL InnoDB的死锁处理机制：等待超时（innodb_lock_wait_timeout默认50秒），超时后自动回滚较小的事务释放锁资源。死锁检测（innodb_deadlock_detect默认ON），InnoDB通过构建等待图（wait-for graph）检测是否存在循环依赖，发现死锁后选择回滚代价最小的事务（undo log量最少的事务）。通过SHOW ENGINE INNODB STATUS可以查看最近一次死锁的详细信息包括涉及的事务、锁定的资源和等待关系。预防措施：所有事务按固定顺序访问表和行避免交叉锁定。尽量缩短事务持有锁的时间减少锁竞争范围。使用合理的索引避免锁升级为表锁。大事务拆分为小事务降低锁冲突概率。使用SELECT ... FOR UPDATE NOWAIT或SKIP LOCKED避免锁等待。监控死锁日志设置innodb_print_all_deadlocks将所有死锁信息输出到错误日志。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis为什么这么快？",
+    "keywords": "内存操作、IO多路复用、单线程",
+    "answer": "Redis速度快的核心原因：纯内存操作，数据存储在内存中读写速度比磁盘快几个数量级。IO多路复用，Redis基于epoll或kqueue实现单线程模型下的高效IO处理，单个线程可以处理大量并发连接。单线程避免了上下文切换和锁竞争的开销，所有操作都是原子性的无需加锁。高效的数据结构，Redis针对不同数据类型实现了优化的底层数据结构如SDS、ziplist、quicklist、skiplist等。C语言实现接近底层硬件性能。Pipeline批量操作减少网络往返次数。Redis的瓶颈不在CPU而在内存和网络带宽。需要注意的是Redis 6.0引入了多线程IO用于处理网络读写但命令执行仍是单线程保持了原子性。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis有哪些数据类型？底层数据结构是什么？",
+    "keywords": "5种基础类型、底层编码",
+    "answer": "Redis有5种基础数据类型。String：可存储字符串、整数、浮点数，底层用SDS（简单动态字符串）实现，支持二进制安全。List：有序列表支持从两端操作，底层用quicklist（ziplist加linkedlist的混合体）实现。Hash：键值对集合类似Java的HashMap，底层小数据用ziplist大数据用hashtable。Set：无序不重复元素集合支持交并差运算，底层小数据用intset大数据用hashtable。Sorted Set（ZSet）：有序集合每个元素关联一个score用于排序，底层小数据用ziplist大数据用skiplist加hashtable。Redis 5.0新增Stream用于消息队列场景。高级类型包括HyperLogLog（基数统计）、Bitmap（位操作）、GeoSpatial（地理位置）。理解底层数据结构有助于根据场景选择合适类型和优化内存使用。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis集群的原理是什么？",
+    "keywords": "数据分片、Gossip协议、故障转移",
+    "answer": "Redis Cluster采用去中心化的分布式架构，将所有数据分为16384个哈希槽（slot），每个节点负责一部分slot。数据路由：对key计算CRC16哈希值对16384取模确定slot归属。客户端发送命令时如果目标slot不在当前节点会返回MOVED重定向。Cluster支持在线迁移slot实现扩缩容。节点间通过Gossip协议交换状态信息（PING和PONG）检测节点存活。故障检测：当半数以上master节点检测到某节点PFAIL状态则标记为FAIL并触发故障转移。故障转移流程：从节点中选举新master（Raft算法），新master接管原master的slot。Cluster要求至少3个master节点且建议每个master配一个slave。局限性：不支持跨slot的多key操作（可用hash tag解决）、不支持SELECT多数据库、批量操作需要确保key在同一个slot。"
+  },
+  {
+    "category": "Redis",
+    "question": "如何用Redis实现分布式锁？",
+    "keywords": "SET NX EX、Redisson、Redlock",
+    "answer": "Redis分布式锁基本实现：SET key value NX EX timeout（原子操作设置值和过期时间）。NX保证只有一个客户端能设置成功，EX设置过期时间防止死锁，value使用UUID标识锁持有者。释放锁时先比较value是否为自己设置的再删除（Lua脚本保证原子性）。Redisson框架封装了完善的分布式锁实现：看门狗机制自动续期防止业务未完成锁就过期；支持可重入锁、公平锁、读写锁；底层使用Lua脚本保证操作原子性。Redlock算法：向N个独立Redis实例请求加锁，超过半数成功且总耗时小于锁有效期则获取成功。但Redlock在网络分区等场景下存在争议。生产建议：使用Redisson框架，设置合理的锁超时时间，业务逻辑中使用try-finally确保释放锁，考虑使用看门狗自动续期。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis哨兵模式是什么？有什么作用？",
+    "keywords": "监控、自动故障转移、配置中心",
+    "answer": "Redis Sentinel（哨兵）是Redis的高可用方案。核心功能：监控，哨兵节点持续检测master和slave是否正常工作；通知，通过API向管理员或其他应用程序发送故障通知；自动故障转移，当master不可用时自动将一个slave提升为新master并更新其他slave的复制目标；配置中心，客户端通过哨兵获取当前master的地址。工作原理：每个哨兵定期向master和slave发送PING命令，超时未响应则标记为主观下线（SDOWN）。当足够多的哨兵（quorum个）都认为节点下线则标记为客观下线（ODOWN）并发起故障转移。故障转移流程：哨兵leader选举、选择最优slave（优先级、复制偏移量、runid）、提升为master、通知其他slave重新复制、更新客户端配置。Sentinel通常部署为3个或5个节点确保高可用。"
+  },
+  {
+    "category": "Redis",
+    "question": "如何保证缓存和数据库的一致性？",
+    "keywords": "Cache Aside、延迟双删、最终一致性",
+    "answer": "保证缓存和数据库一致性的常见方案。Cache Aside Pattern（旁路缓存）：读时先查缓存，命中直接返回；未命中查数据库并写入缓存。写时先更新数据库再删除缓存（不是更新缓存避免并发问题）。延迟双删：写操作时先删除缓存、更新数据库、延迟一段时间再删除缓存，解决主从延迟导致的脏数据。异步一致性方案：基于Canal监听binlog异步更新缓存，实现最终一致性但架构复杂。一致性Hash加版本号：缓存写入时携带版本号，删除时比对版本号防止并发导致的不一致。常见的坑：先删缓存再更新数据库在并发下可能导致脏数据；更新缓存而非删除缓存可能导致缓存与数据库不一致。最佳实践：写操作先更新数据库再删缓存，配合缓存超时兜底，读多写少场景可用延迟双删或binlog异步方案。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis如何实现排行榜？",
+    "keywords": "ZSet、ZRANK、ZREVRANGE",
+    "answer": "Redis的ZSet（有序集合）天然适合实现排行榜。实现方案：使用ZADD将用户ID作为member，分数作为score加入ZSet。更新分数使用ZINCRBY原子递增。获取排名：ZREVRANK获取某用户的降序排名（从0开始）。获取Top N：ZREVRANGE 0 N-1 WITHSCORES获取前N名及分数。获取某用户分数：ZSCORE。获取分数区间用户数：ZCOUNT。ZSet底层使用skiplist按score排序，插入、删除、排名查询的时间复杂度均为O(log N)。实际应用中可以为不同维度创建不同ZSet如总榜、日榜、周榜。使用ZUNIONSTORE可以合并多个ZSet实现跨时间段汇总。注意Redis单个ZSet最多存储2的32次方减1个元素。对于超大规模排行榜可以考虑分片ZSet。"
+  },
+  {
+    "category": "Redis",
+    "question": "什么是布隆过滤器？Redis中如何使用？",
+    "keywords": "概率型数据结构、误判率、防穿透",
+    "answer": "布隆过滤器是一种概率型数据结构，用于判断一个元素是否存在于集合中。特点：如果判断元素不存在则一定不存在；如果判断元素存在则可能存在（存在误判）。底层原理：使用位数组（bitmap）和多个哈希函数，添加元素时将多个哈希函数映射的位设为1，查询时检查所有映射位是否都为1。Redis中使用RedisBloom模块提供的BF.ADD、BF.EXISTS命令。常见应用场景：缓存穿透防护，在查询数据库前先通过布隆过滤器判断key是否可能存在，不存在则直接返回，避免大量无效请求穿透到数据库。垃圾邮件过滤、爬虫URL去重。误判率可通过调整位数组大小和哈希函数数量来控制。建议误判率设置为1%左右位数组大小为元素数量的10倍，哈希函数数量为位数组大小乘ln2除以元素数量。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis的过期删除策略和内存淘汰策略分别是什么？",
+    "keywords": "惰性删除、定期删除、8种淘汰策略",
+    "answer": "过期删除策略：Redis采用惰性删除加定期删除相结合的方式。惰性删除：访问key时才检查是否过期，过期则删除，缺点是过期key可能长时间未被访问占用内存。定期删除：每隔一段时间随机检查一批key并删除过期的，通过控制每次检查时间和key数量平衡CPU和内存开销。内存淘汰策略（maxmemory-policy）：noeviction（默认）内存满时拒绝新写入。allkeys-lru（推荐）从所有key中淘汰最近最少使用的。volatile-lru从设置了过期时间的key中淘汰LRU。allkeys-lfu淘汰最不常用的。volatile-lfu淘汰过期key中最不常用的。allkeys-random随机淘汰。volatile-random随机淘汰过期key。volatile-ttl淘汰即将过期的key。选择建议：大多数场景用allkeys-lru，缓存场景也可考虑allkeys-lfu。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis事务是什么？有什么限制？",
+    "keywords": "MULTI/EXEC、不支持回滚",
+    "answer": "Redis事务通过MULTI、EXEC、DISCARD、WATCH四个命令实现。MULTI开启事务，后续命令入队但不执行。EXEC提交事务按顺序执行队列中所有命令。DISCARD取消事务。WATCH实现乐观锁，在EXEC前监控key变化，如果被其他客户端修改则EXEC失败。Redis事务的特点：所有命令顺序执行不会被打断保证原子性；但与关系数据库事务不同的是不支持回滚，如果队列中某条命令执行失败其他命令仍会继续执行。不支持ACID中的隔离性，因为事务中的命令不会被其他客户端的命令插入。WATCH提供的是CAS风格的原子操作而非真正的事务隔离。Redis事务适用于需要保证一组命令连续执行的场景如转账操作。更复杂的事务需求可以使用Lua脚本实现真正的原子性。"
+  },
+  {
+    "category": "Redis",
+    "question": "为什么Redis要用Lua脚本？",
+    "keywords": "原子执行、减少网络往返、复杂逻辑",
+    "answer": "Redis使用Lua脚本有多方面优势。原子性：Lua脚本在Redis中执行时是原子的，脚本执行期间不会有其他命令插入，适合实现需要原子操作的复杂逻辑如分布式锁释放、限流器。减少网络往返：多个命令可以在一个Lua脚本中一次性发送到Redis执行，避免多次网络IO，提升性能。原子操作组合：可以将多个读写操作组合为一个原子操作，比如先检查再修改的场景。幂等操作：Lua脚本可以实现幂等逻辑避免重复执行问题。Redis保证脚本的原子执行通过单线程模型实现，所有脚本在主循环中串行执行。使用EVAL或EVALSHA命令执行Lua脚本，脚本中通过redis.call()或redis.pcall()调用Redis命令。注意脚本执行时间不能过长（默认5秒）避免阻塞其他命令。建议将Lua脚本加载到Redis中通过EVALSHA执行减少传输开销。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis Pipeline是什么？有什么好处？",
+    "keywords": "批量操作、减少RTT",
+    "answer": "Pipeline是Redis提供的批量操作机制，允许客户端一次发送多个命令而不需要等待每个命令的响应。原理：客户端将多个命令打包通过一次网络请求发送给Redis，Redis依次执行后将所有结果一次性返回。好处：显著减少网络往返时间（RTT），普通模式下每个命令都需要一次网络往返，Pipeline可以将N次往返合并为1次。对于大量小命令的场景性能提升可达数倍甚至数十倍。注意事项：Pipeline不是原子操作，其他客户端的命令可能穿插执行。Pipeline命令数量不宜过多避免单次响应过大占用过多内存。需要确保命令之间没有依赖关系或能容忍中间状态。Jedis和Lettuce都支持Pipeline，Lettuce通过StatefulRedisConnection.async().commands()获取batch接口。适合批量导入数据、批量查询等场景。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis有哪些持久化方式？各自特点？",
+    "keywords": "RDB、AOF、混合持久化",
+    "answer": "Redis持久化方式有三种。RDB（Redis Database）：快照方式在指定时间间隔内将内存数据写入磁盘生成dump.rdb文件。优点：文件紧凑适合备份和灾恢复；恢复速度快；对性能影响小（fork子进程执行）。缺点：可能丢失最后一次快照后的数据；大数据集fork耗时可能阻塞。AOF（Append Only File）：将每个写命令追加到日志文件。三种fsync策略：always（每次写都fsync，最安全但性能差）、everysec（每秒fsync，推荐）、no（由OS决定）。优点：数据更安全最多丢1秒数据；文件可读性好。缺点：文件大需要定期rewrite。混合持久化（Redis 4.0+）：AOF rewrite时使用RDB格式存储数据部分，追加的命令仍用AOF格式，结合两者优点。建议生产环境使用混合持久化。"
+  },
+  {
+    "category": "Redis",
+    "question": "什么是Redis的BigKey？如何处理？",
+    "keywords": "大key检测、拆分、删除",
+    "answer": "BigKey是指占用内存过大的key（如String超过10KB、集合元素超过5000个）。危害：读写操作耗时长阻塞其他命令；网络带宽占用大；内存不均衡导致集群数据倾斜；过期删除时可能阻塞（Redis 4.0+异步删除）。检测方法：redis-cli --bigkeys扫描各类型最大key；MEMORY USAGE key查看具体占用；redis-rdb-tools分析dump文件。处理策略：拆分大key，如大Hash拆为多个小Hash（按字段前缀或hash取模分片），大List或Set拆为多个子集合。异步删除大key（Redis 4.0+使用UNLINK替代DEL，后台线程异步释放内存）。优化数据结构如Hash超过阈值时从ziplist转为hashtable。定期监控BigKey通过自定义脚本或监控工具告警。预防：设计时评估数据量增长趋势，提前做好分片方案。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis主从复制的原理是什么？",
+    "keywords": "全量同步、增量同步、offset",
+    "answer": "Redis主从复制分为全量同步和增量同步两个阶段。全量同步（初次连接或断线过久）：从节点发送PSYNC ? -1 999触发全量同步。主节点执行BGSAVE生成RDB快照发送给从节点，同时将期间的写命令缓存在repl_backlog_buffer中。从节点加载RDB后主节点发送缓存的写命令。增量同步（短暂断线后重连）：从节点发送PSYNC replid offset，主节点检查repl_backlog_buffer中是否包含从节点缺失的数据，如果包含则只发送差异数据（基于offset偏移量），否则触发全量同步。repl_backlog_buffer是一个环形缓冲区默认1MB建议增大以减少全量同步频率。复制积压缓冲区通过repl-backlog-size配置。主从复制是异步的从节点数据会有延迟，适合读写分离场景。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis和Memcached有什么区别？",
+    "keywords": "数据结构、持久化、集群、线程模型",
+    "answer": "主要区别：数据结构，Redis支持String、List、Hash、Set、ZSet等丰富数据结构，Memcached只支持简单的Key-Value（字符串）。持久化，Redis支持RDB和AOF持久化，Memcached不支持持久化重启数据丢失。集群模式，Redis原生支持Cluster集群和哨兵模式，Memcached客户端通过一致性Hash实现分布式。线程模型，Redis单线程执行命令（6.0引入多线程IO），Memcached多线程利用多核CPU。内存管理，Redis使用jemalloc内存分配器，Memcached使用Slab Allocation机制预分配内存块减少碎片。数据大小限制，Redis单个Value最大512MB，Memcached单个Value默认1MB。发布订阅，Redis支持Pub/Sub，Memcached不支持。选择建议：需要丰富数据结构、持久化、高可用选Redis；简单KV缓存且追求多核性能选Memcached。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis的跳表（skiplist）原理是什么？",
+    "keywords": "多层链表、概率平衡、O(log N)",
+    "answer": "跳表是一种有序数据结构，通过在每个节点中维持多个指向其他节点的指针从而达到快速访问的目的。ZSet底层使用跳表加hashtable实现。基本思想是构建多层索引来加速搜索，底层是完整的有序链表，上层是稀疏的索引层。查找时从最高层开始，每层跳跃式前进直到找到目标或定位到底层。时间复杂度平均O(log N)，与平衡树相当但实现更简单。跳表的优势：范围查询天然支持（定位起始点后沿底层链表顺序遍历即可）；插入和删除只需修改相关节点的前后指针不需要复杂的旋转操作；并发友好不同区域可以独立加锁。Redis跳表实现细节：每个节点最高32层；通过概率算法（P=0.25）决定新节点的层数；维护头节点和尾节点以及当前最大层数。比红黑树实现简单且范围查询更高效。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis的常见应用场景有哪些？",
+    "keywords": "缓存、会话、排行榜、分布式锁",
+    "answer": "Redis的典型应用场景：缓存，最常见用途减轻数据库压力，设置合理的TTL和淘汰策略。会话存储（Session），将用户会话数据存在Redis中实现分布式环境下的会话共享。排行榜或计数器，利用ZSet的排序功能实现各类排行榜，INCR实现原子计数。分布式锁，通过SET NX EX实现跨进程的互斥访问。消息队列，使用List的LPUSH和BRPOP或Pub/Sub或Stream实现简单消息队列。限流器，利用INCR加EXPIRE或RedisCell模块实现滑动窗口限流。布隆过滤器防穿透，利用RedisBloom模块实现。地理位置服务，使用GeoSpatial类型存储经纬度实现附近的人等功能。位图统计，使用Bitmap实现签到、在线状态等。实时排行榜、抽奖系统、社交关系（好友列表使用Set的交并差）等。选择Redis作为技术方案时要考虑其单线程特性和内存限制。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis可能出现的性能瓶颈有哪些？",
+    "keywords": "大key、热key、内存不足、网络",
+    "answer": "Redis性能瓶颈常见原因及解决方案。大Key问题：单个key占用内存过大导致操作阻塞，检测后拆分或删除。热Key问题：某些key访问频率极高导致单节点压力过大，解决方案包括本地缓存加Redis二级缓存、key分散（加后缀分散到不同slot）、读写分离。内存不足：达到maxmemory限制触发淘汰，监控内存使用合理设置maxmemory和淘汰策略。慢查询：复杂命令如KEYS *、SORT、大量元素的SUNION等阻塞服务，使用SCAN替代KEYS，避免在生产环境使用O(N)命令。连接数耗尽：大量客户端连接超出maxclients，使用连接池复用连接。网络带宽：大量数据传输占满网络，使用Pipeline减少往返、压缩数据。CPU饱和：虽然Redis是单线程但复杂计算或大量命令仍可能打满单核CPU，注意监控CPU使用率。建议使用Redis慢查询日志（slowlog）定位性能问题。"
+  },
+  {
+    "category": "Redis",
+    "question": "Redis客户端有哪些？如何选择？",
+    "keywords": "Jedis、Lettuce、Redisson",
+    "answer": "Java常用的Redis客户端。Jedis：最基础的Redis客户端，直接封装Redis命令，简单直观。特点：每个操作都是阻塞的需要获取连接使用后归还，连接池管理（推荐使用commons-pool2）。适合简单场景但不支持异步和响应式。Lettuce：Spring Data Redis默认客户端，基于Netty实现支持异步和响应式编程。特点：线程安全支持单连接高性能，支持Redis Cluster、哨兵、Pipeline、Lua脚本。Spring Boot中通过spring.redis.lettuce配置。Redisson：分布式服务框架，封装了分布式锁、分布式集合、分布式限流器等高级功能。特点：API丰富开箱即用，基于Netty支持异步，内置看门狗机制。适合需要分布式协调的场景。选择建议：简单场景用Lettuce（Spring默认），需要高级分布式功能用Redisson，轻量级项目可以用Jedis。连接池配置建议使用Lettuce连接池或默认的Netty多路复用。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring的启动过程是怎样的？",
+    "keywords": "BeanFactory、ApplicationContext、生命周期",
+    "answer": "Spring应用启动过程：创建ApplicationContext并刷新。prepareRefresh准备环境变量和属性源。obtainFreshBeanFactory获取DefaultListableBeanFactory。invokeBeanFactoryPostProcessors执行所有BeanFactory后处理器（如ConfigurationClassPostProcessor解析@Configuration、@Bean等注解）。registerBeanPostProcessors注册Bean后处理器。initMessageSource处理国际化。initApplicationEventMulticaster初始化事件广播器。onRefresh子类扩展（如SpringBoot启动内嵌Tomcat）。registerListeners注册监听器。finishBeanFactoryInitialization实例化所有非懒加载的单例Bean。finishRefresh发布ContextRefreshedEvent。整个过程体现了Spring的扩展点设计，每个步骤都预留了扩展接口。SpringBoot在此基础上增加了自动配置、内嵌服务器等特性。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring中使用了哪些设计模式？",
+    "keywords": "工厂、代理、模板方法、观察者",
+    "answer": "Spring框架大量使用设计模式。工厂模式：BeanFactory是工厂模式的典型应用通过getBean()创建对象。代理模式：AOP通过JDK动态代理或CGLIB为目标对象创建代理。单例模式：Spring Bean默认是单例的通过三级缓存管理。模板方法模式：JdbcTemplate、RestTemplate等封装了固定的流程骨架允许用户自定义实现。观察者模式：ApplicationEvent和ApplicationListener实现事件驱动机制。适配器模式：HandlerAdapter适配不同类型的Handler。策略模式：Resource接口有不同实现ClassPathResource、FileSystemResource等。装饰器模式：BeanWrapper对Bean的属性访问进行包装。责任链模式：Bean的生命周期回调链。组合模式：CompositeComponent组件树。这些设计模式的应用体现了Spring的优秀架构设计，理解这些模式有助于深入理解Spring源码。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring事务传播行为有哪几种？",
+    "keywords": "7种传播行为、REQUIRED、REQUIRES_NEW",
+    "answer": "Spring定义了7种事务传播行为。REQUIRED（默认）：如果当前存在事务则加入，不存在则新建事务。REQUIRES_NEW：总是新建事务，如果存在事务则挂起。MANDATORY：必须在已有事务中执行否则抛异常。SUPPORTS：有事务则在事务中执行，无事务则非事务执行。NOT_SUPPORTED：以非事务方式执行，有事务则挂起。NEVER：必须以非事务方式执行，有事务则抛异常。NESTED：如果存在事务则创建嵌套事务（SavePoint），嵌套事务可独立回滚不影响外层事务。最常用的两种：REQUIRED适用于大多数业务方法；REQUIRES_NEW适用于需要独立事务的场景如日志记录。注意事项：嵌套事务底层通过SavePoint实现并非真正的新事务；自调用（同类方法调用）不会触发生效的传播行为因为未经过代理；异常类型影响事务回滚默认RuntimeException和Error回滚。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring如何解决循环依赖？",
+    "keywords": "三级缓存、提前暴露",
+    "answer": "Spring通过三级缓存机制解决单例Bean的属性注入循环依赖。三级缓存：singletonObjects（一级缓存存放完整的Bean）、earlySingletonObjects（二级缓存存放提前暴露的半成品Bean）、singletonFactories（三级缓存存放Bean工厂对象）。解决流程：创建A时发现依赖B、将A的工厂放入三级缓存、实例化A（对象创建但属性未填充）、填充属性发现需要B、开始创建B、B依赖A、从三级缓存获取A的工厂调用getObject()获取A的早期引用放入二级缓存、B完成创建、A继续完成属性填充。三级缓存的作用：在需要代理的情况下（如AOP）提前创建代理对象，保证获取到的是代理后的对象。注意：Spring Boot 2.6+默认禁止循环依赖；构造器注入的循环依赖无法解决因为Bean尚未创建完成。推荐通过@Lazy或重构代码避免循环依赖。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "什么是Spring的IOC？",
+    "keywords": "控制反转、依赖注入、容器管理",
+    "answer": "IOC（Inversion of Control）即控制反转是一种设计思想。传统开发中对象自己创建和管理依赖对象（new），IOC将对象的创建和依赖关系的管理交给容器。对象不再主动获取依赖而是被动接收容器注入的依赖。IOC的核心优势：解耦，对象不需要知道依赖的具体实现类只面向接口编程；集中管理，所有Bean的生命周期由容器统一管理；便于测试，可以通过注入Mock对象进行单元测试。IOC容器是Spring的核心，BeanFactory提供基本的容器功能ApplicationContext是其增强版提供了国际化、事件发布、AOP等高级功能。实现IOC的底层技术包括：Bean定义解析（XML或注解）、Bean实例化（反射）、依赖注入（构造器注入、Setter注入、@Autowired）。Spring IOC是理解整个Spring框架的基础。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "什么是Spring的AOP？",
+    "keywords": "切面、切点、通知、代理",
+    "answer": "AOP（Aspect-Oriented Programming）即面向切面编程用于将横切关注点（如日志、事务、权限）从业务逻辑中分离出来。核心概念：切面（Aspect）封装横切逻辑的模块，切点（Pointcut）定义在哪些方法上执行切面逻辑，通知（Advice）切面的具体执行时机（Before、After、AfterReturning、AfterThrowing、Around），连接点（JoinPoint）程序执行的特定点如方法调用。Spring AOP基于代理实现：目标类实现了接口使用JDK动态代理（基于java.lang.reflect.Proxy和InvocationHandler），否则使用CGLIB（生成目标类的子类）。AspectJ是更强大的AOP框架支持编译时织入和加载时织入。Spring AOP是运行时代理在性能上有一定开销但足够满足大多数场景。典型应用：事务管理（@Transactional）、日志记录、权限校验、缓存处理、性能监控。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring Bean的生命周期是怎样的？",
+    "keywords": "实例化、初始化、销毁、回调",
+    "answer": "Spring Bean完整生命周期：实例化（Instantiation）通过构造函数或工厂方法创建Bean对象。属性填充（Populate）通过DI注入依赖属性。Aware接口回调：BeanNameAware、BeanFactoryAware、ApplicationContextAware等。BeanPostProcessor前置处理：postProcessBeforeInitialization。InitializingBean.afterPropertiesSet()：属性设置完成后回调。@PostConstruct：注解标记的初始化方法。自定义init-method：XML中指定的初始化方法。BeanPostProcessor后置处理：postProcessBeforeInitialization（AOP代理在此阶段创建）。Bean就绪可使用。销毁阶段：@PreDestroy、DisposableBean.destroy()、自定义destroy-method。整个生命周期由Spring IoC容器管理，关键扩展点包括BeanPostProcessor（可对所有Bean进行后处理）和InitializingBean（自定义初始化逻辑）。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "SpringBoot的启动过程是怎样的？",
+    "keywords": "SpringApplication.run、自动配置、内嵌服务器",
+    "answer": "SpringBoot启动过程：SpringApplication.run()方法启动。创建SpringApplication实例判断是否Web应用、设置初始器和监听器。准备环境Environment（配置文件、系统属性、环境变量等）。创建ApplicationContext（Web应用创建AnnotationConfigServletWebServerApplicationContext）。refresh()刷新容器，执行Spring标准启动流程（BeanFactory初始化、Bean注册、实例化等）。onRefresh()中创建并启动内嵌Tomcat或Jetty或Undertom服务器。执行ApplicationRunner和CommandLineRunner回调。发布ApplicationReadyEvent。关键机制：自动配置通过@EnableAutoConfiguration触发SpringFactoriesLoader加载META-INF/spring.factories中的配置类；条件注解（@ConditionalOnClass、@ConditionalOnProperty等）控制配置是否生效；Starter依赖打包了相关组件的默认配置。整个启动过程约1-3秒，可通过--debug查看自动配置报告。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "SpringBoot的自动配置原理是什么？",
+    "keywords": "@EnableAutoConfiguration、条件注解、spring.factories",
+    "answer": "SpringBoot自动配置原理：@SpringBootApplication注解包含@EnableAutoConfiguration，该注解通过@Import(AutoConfigurationImportSelector.class)触发自动配置加载。AutoConfigurationImportSelector读取META-INF/spring.factories（Spring Boot 2.7+改为META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports）中定义的自动配置类列表。每个自动配置类（如DataSourceAutoConfiguration）使用@Conditional系列注解进行条件判断：@ConditionalOnClass在classpath存在某个类时生效；@ConditionalOnMissingBean容器中没有某个Bean时才创建；@ConditionalOnProperty配置属性满足条件时生效。这样确保了只加载项目实际需要的配置。开发者可以通过配置文件自定义行为或通过exclude排除特定自动配置。理解自动配置原理有助于排查启动问题和自定义Starter。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "什么是SpringBoot的Starter？",
+    "keywords": "依赖打包、默认配置、自定义Starter",
+    "answer": "Starter是SpringBoot提供的依赖管理方案，将相关依赖和默认配置打包在一起简化项目配置。引入一个Starter即可获得完整的技术栈支持如spring-boot-starter-web包含Spring MVC、内嵌Tomcat、Jackson序列化等。核心Starter包括：spring-boot-starter（核心启动器）、spring-boot-starter-web（Web开发）、spring-boot-starter-data-jpa（JPA数据访问）、spring-boot-starter-security（安全）、spring-boot-starter-cache（缓存）等。自定义Starter需要创建两个模块：autoconfigure模块（自动配置逻辑，包含@Configuration类和spring.factories）和starter模块（仅包含依赖引入）。命名规范：官方starter使用spring-boot-starter-xxx，第三方使用xxx-spring-boot-starter。Starter的设计理念是约定优于配置，通过合理的默认值减少配置工作量，同时保留通过配置文件自定义的能力。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "SpringBoot应用如何通过main方法启动web服务器？",
+    "keywords": "内嵌Tomcat、ServletWebServerApplicationContext",
+    "answer": "SpringBoot通过main方法启动web服务器的原理：SpringApplication.run()启动Spring容器后在onRefresh()阶段调用ServletWebServerApplicationContext的createWebServer()方法。该方法检查容器中是否存在ServletWebServerFactory Bean（如TomcatServletWebServerFactory），如果存在则创建内嵌的Tomcat或Jetty服务器。流程：创建ServerFactory、配置端口和ContextPath等、部署DispatcherServlet、启动服务器、开始监听请求。Tomcat的启动是嵌入在Spring容器生命周期中的，不需要独立的Tomcat安装。配置自定义端口在application.yml中设置server.port。也可以通过编程方式定制Tomcat：注册TomcatServletWebServerFactory Bean并自定义连接器、线程池等参数。SpringBoot支持Tomcat（默认）、Jetty和Undertow三种内嵌服务器，通过排除或引入对应的starter来切换。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "SpringBoot的核心特性有哪些？",
+    "keywords": "自动配置、Starter、Actuator、配置管理",
+    "answer": "SpringBoot核心特性：自动配置根据项目依赖自动配置Spring和第三方库，减少手动配置。Starter依赖管理打包相关依赖和默认配置简化构建配置。内嵌Web服务器（Tomcat、Jetty、Undertow）无需部署war文件直接运行jar。外部化配置支持application.yml或properties、环境变量、命令行参数等多种配置方式。健康检查和监控通过Spring Boot Actuator提供health、info、metrics等端点。自动重启（devtools）开发时修改代码自动重启。宽松绑定配置属性绑定更灵活支持kebab-case、camelCase等命名。类型安全配置通过@ConfigurationProperties提供类型安全的配置绑定。Profile机制区分不同环境配置如dev、test、prod。日志框架统一默认使用Logback可通过starter切换。支持GraalVM原生镜像编译。这些特性使SpringBoot成为Java企业级开发的首选框架。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "什么是SpringBoot？",
+    "keywords": "约定优于配置、快速开发",
+    "answer": "SpringBoot是基于Spring框架的快速开发脚手架，旨在简化Spring应用的创建和部署过程。核心理念是约定优于配置（Convention over Configuration），通过合理的默认值和自动配置减少开发者的配置工作量。SpringBoot不是Spring的替代品而是基于Spring的增强。主要特点：快速创建独立运行的Spring应用（java -jar直接运行）；内嵌Web服务器无需外部部署；自动配置减少手工配置；提供生产级特性如健康检查、指标监控；无代码生成和XML配置要求。SpringBoot的版本策略：2.x支持Java 8+，3.x要求Java 17+。生态：Spring Boot、Spring Cloud（微服务）、Spring Data（数据访问）、Spring Security（安全）形成完整的技术栈。版本推荐使用最新的3.x系列配合Java 17 LTS。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring AOP的代理方式有哪些？区别是什么？",
+    "keywords": "JDK动态代理、CGLIB、选择规则",
+    "answer": "Spring AOP的两种代理方式。JDK动态代理：基于java.lang.reflect.Proxy和InvocationHandler接口，要求目标类必须实现接口。代理对象实现了与目标类相同的接口，通过反射调用目标方法。优点：不修改目标类代码；标准JDK支持无需额外依赖。CGLIB代理：基于ASM字节码框架，通过继承目标类生成子类作为代理对象。不要求目标类实现接口但目标类不能是final的。优点：不需要接口；方法拦截更直接。Spring默认选择规则：Spring Boot 2.x默认使用CGLIB（proxyTargetClass=true），Spring Boot 3.x保持此默认。当目标类有接口时Spring默认使用JDK动态代理，可通过proxyTargetClass=true强制使用CGLIB。性能对比：JDK代理在现代JVM上性能与CGLIB接近，CGLIB创建代理略慢但调用更快。选择建议：遵循Spring默认配置，无特殊需求无需手动调整。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring有哪些核心模块？",
+    "keywords": "Core、Context、AOP、Data Access",
+    "answer": "Spring框架核心模块：spring-core是基础模块提供IoC和DI功能包含BeanFactory。spring-context是核心容器扩展提供ApplicationContext支持国际化、事件发布、资源加载。spring-beans提供Bean的定义、创建和依赖注入。spring-aop提供面向切面编程支持包括AOP联盟接口和AspectJ集成。spring-expression（SpEL）提供强大的表达式语言用于运行时查询和操作对象。spring-jdbc提供JDBC抽象层简化数据库操作。spring-tx提供声明式和编程式事务管理。spring-orm提供ORM框架集成（Hibernate、JPA等）。spring-web提供Web开发基础支持Servlet和WebMVC。spring-webmvc是MVC框架实现DispatcherServlet和Controller。spring-test提供测试支持。Spring生态还包括Spring Boot（快速启动）、Spring Cloud（微服务）、Spring Data（数据访问）等项目。模块间低耦合可按需引入。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "什么是Spring的DI（依赖注入）？",
+    "keywords": "构造器注入、Setter注入、@Autowired",
+    "answer": "DI（Dependency Injection）依赖注入是IOC的具体实现方式。容器在创建对象时自动将依赖对象注入到目标对象中，而不是由对象自己创建。三种注入方式：构造器注入（推荐）：通过构造函数传入依赖，确保依赖不可变且不为null，适合必须的依赖。Setter注入：通过setter方法设置依赖，适合可选的依赖。字段注入：通过@Autowired注解直接注入字段，代码简洁但不利于测试且无法保证不可变性。Spring支持的注入方式：@Autowired（默认按类型注入，可配合@Qualifier按名称注入）、@Resource（JSR-250按名称注入）、@Value（注入配置值）。最佳实践：推荐使用构造器注入配合@RequiredArgsConstructor（Lombok），保证依赖的完整性，便于单元测试时传入Mock对象。避免循环依赖（构造器注入无法解决循环依赖）。"
+  },
+  {
+    "category": "Spring & Spring Boot",
+    "question": "Spring循环依赖有哪些解决方式？",
+    "keywords": "构造器注入、@Lazy、重构设计",
+    "answer": "除了三级缓存自动解决属性注入的循环依赖外还有其他方式。构造器注入循环依赖：Spring Boot 2.6+默认禁止且构造器注入无法通过三级缓存解决（因为Bean尚未创建完成），需要改为属性注入或Setter注入。@Lazy延迟加载：在注入点添加@Lazy注解，注入代理对象而非真实Bean，首次使用时才创建真实Bean打破循环。重构设计：最根本的解决方案是重新设计依赖关系，将共同依赖的逻辑提取到第三个Bean中，或使用事件机制解耦。@DependsOn：强制指定Bean的创建顺序但不解决真正的循环依赖。三级缓存机制限制：只支持单例Bean的属性注入循环依赖；不支持prototype作用域；不支持构造器注入；Spring Boot 2.6+默认禁止可通过spring.main.allow-circular-references=true开启（不推荐）。最佳实践：从架构设计上避免循环依赖，循环依赖通常暗示职责划分不合理。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "什么是配置中心？有哪些实现方案？",
+    "keywords": "集中管理、动态刷新、Nacos/Apollo",
+    "answer": "配置中心是微服务架构中集中管理配置信息的组件。核心功能：配置集中存储和版本管理；配置动态刷新无需重启应用；配置环境隔离（dev/test/prod）；配置权限控制和审计；灰度发布和配置回滚。实现方案：Spring Cloud Config基于Git存储配置，通过Config Server对外提供配置服务，支持@RefreshScope动态刷新但需要消息总线配合。Apollo（携程开源）功能完备的配置中心，支持配置版本管理、灰度发布、权限控制、审计日志等，提供完善的管理界面。Nacos（阿里开源）同时支持服务发现和配置管理，配置变更实时推送（基于长轮询），支持Namespace、Group、DataId三级隔离。Consul（HashiCorp）既支持服务发现也支持配置管理。选择建议：中小企业可用Nacos（同时解决服务发现和配置），大规模企业可用Apollo（配置管理功能更完善）。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "微服务架构如何处理分布式事务？",
+    "keywords": "CAP、最终一致性、Saga、TCC",
+    "answer": "微服务架构中分布式事务是核心难题。CAP定理：分布式系统中一致性（C）、可用性（A）、分区容错性（P）不能同时满足，通常选择AP保证可用性。BASE理论：基本可用、软状态、最终一致性，是分布式事务的理论基础。常见方案：2PC或3PC强一致性方案性能差不推荐。TCC在业务层面实现补偿逻辑适合对一致性要求高的场景。Saga模式将长事务拆为多个本地事务每个有对应的补偿操作，编排方式分为编排式（Seata Saga）和协奏式（事件驱动）。本地消息表通过本地事务保证消息与业务操作一致再异步确保最终一致性。事务消息（RocketMQ）提供半消息机制实现最终一致性。Seata提供AT、TCC、Saga、XA多种模式。选择建议：大多数场景追求最终一致性使用本地消息表或Saga；强一致要求用TCC。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "什么是服务熔断？原理是什么？",
+    "keywords": "Hystrix、Sentinel、状态机",
+    "answer": "服务熔断是一种保护机制当下游服务异常或超时时快速失败避免级联故障。原理类似电路熔断器：正常状态（Closed）请求正常通过、失败率超过阈值进入熔断状态（Open）所有请求直接失败不调用下游、经过一段时间后进入半开状态（Half-Open）允许少量请求尝试如果成功则恢复正常状态否则继续熔断。常用框架：Hystrix（Netflix已停止维护）通过线程池隔离加滑动窗口统计失败率实现熔断。Sentinel（阿里开源）更强大的流量控制组件支持QPS限流、线程数限流、熔断降级等，提供实时监控Dashboard。Resilience4j（轻量级替代Hystrix）支持熔断、限流、重试、超时等功能。熔断的关键参数：失败率阈值、慢调用比例阈值、熔断持续时间、半开状态探测请求数。配合降级策略（返回默认值、缓存数据、友好提示）提升用户体验。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "什么是服务降级？和熔断有什么关系？",
+    "keywords": "fallback、限流降级、熔断降级",
+    "answer": "服务降级是在系统压力增大或部分服务不可用时主动或自动降低服务质量保证核心功能可用。降级类型：超时降级（调用超时返回兜底数据）、熔断降级（服务被熔断后走fallback逻辑）、限流降级（系统负载过高时拒绝非核心请求）、异常降级（捕获异常返回默认值）。熔断和降级的关系：熔断是降级的一种触发条件。当下游服务被熔断时自动走降级逻辑。降级是手段熔断是原因之一。实现方式：@SentinelResource注解的fallback属性指定降级方法。Hystrix的@HystrixCommand的fallbackMethod。Resilience4j的fallback方法。降级策略设计原则：核心业务不能降级；降级要快速（避免降级本身也阻塞）；降级要优雅（返回有用信息而非错误页面）；可配置（不同环境不同降级策略）。常见降级方式：返回默认值、返回缓存数据、返回静态页面、排队等待。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "什么是服务雪崩？如何防止？",
+    "keywords": "级联故障、超时控制、限流、熔断",
+    "answer": "服务雪崩是一个服务故障导致调用它的服务也故障从而引发整个服务链路的连锁崩溃。典型场景：服务A调用B调用C，C响应变慢、B的线程池被占满、B对A的请求也变慢、A的线程池也被占满、整个系统瘫痪。防止措施：超时控制，为每个远程调用设置合理的超时时间避免长时间等待。重试机制，设置合理的重试次数和重试间隔避免雪崩。熔断机制，当下游服务异常时快速失败避免占用资源。限流控制，保护每个服务的线程池和连接池不被打满。舱壁隔离（Bulkhead），将不同服务的调用隔离到不同的线程池避免互相影响。降级策略，当服务不可用时返回兜底数据。集群冗余，多实例部署避免单点故障。监控告警，实时监控服务健康状态和调用链路提前发现问题。Sentinel提供完整的保护能力包括限流、熔断、热点防护等。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "微服务中有哪些负载均衡策略？",
+    "keywords": "Ribbon、负载均衡算法",
+    "answer": "微服务负载均衡策略：RoundRobin（轮询）默认策略，按顺序循环分配请求，简单公平。Random（随机）随机选择一个实例，长期内均匀。WeightedResponseTime（加权响应时间）根据实例响应时间动态调整权重，响应快的获得更多请求。BestAvailable（最低并发）选择当前并发数最少的实例。RetryRule（重试轮询）在轮询基础上增加重试机制。ZoneAvoidanceRule（区域亲和性）综合判断实例所在区域的健康状况和负载情况。Spring Cloud默认使用LoadBalancer（替代已停止维护的Ribbon）：RoundRobinLoadBalancer轮询和RandomLoadBalancer随机。Ribbon配置：NFLoadBalancerRuleClassName指定负载均衡策略。实际应用：同机房优先选择ZoneAvoidanceRule；对响应时间敏感选择WeightedResponseTime；需要精确控制流量使用自定义策略。负载均衡应在客户端实现（客户端负载均衡）更灵活。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "什么是限流？有哪些实现方式？",
+    "keywords": "令牌桶、滑动窗口、分布式限流",
+    "answer": "限流是控制请求速率保护系统不被打垮的机制。常见算法：固定窗口计数器在固定时间窗口内限制请求数，简单但存在边界突发问题。滑动窗口计数器将窗口细化减少边界问题。滑动窗口日志记录每个请求的精确时间精确但内存开销大。漏桶算法以固定速率处理请求平滑流量但无法应对突发。令牌桶算法以固定速率生成令牌请求需获取令牌才能处理允许突发（桶容量限制突发量）是业界最常用的算法。实现方式：Sentinel支持QPS限流、线程数限流、关联限流等。Redis加Lua实现分布式令牌桶或滑动窗口限流。Guava的RateLimiter单机限流。网关层限流（Nginx的limit_req、Gateway的RequestRateLimiter）。分布式限流需要考虑多实例间的协调，通常使用Redis存储令牌状态。限流参数设置需要根据系统容量和业务峰值合理配置。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "HTTP和RPC有什么区别？",
+    "keywords": "协议差异、性能、适用场景",
+    "answer": "HTTP和RPC的主要区别：协议层面，HTTP是应用层协议基于文本（HTTP/1.1）或二进制（HTTP/2）传输，RPC可以使用自定义协议基于二进制传输效率更高。序列化方式，HTTP通常使用JSON或XML文本序列化，RPC使用Protobuf、Thrift等二进制序列化效率更高。连接管理，HTTP/1.1短连接需要建立多次TCP连接（HTTP/2支持多路复用），RPC通常使用长连接复用。服务发现，RPC框架（如Dubbo、gRPC）内置服务发现和负载均衡机制，HTTP需要额外的组件（如Nginx、Consul）。适用场景，HTTP适合对外暴露API（浏览器友好、跨语言），RPC适合内部服务间通信（高性能、强类型）。gRPC基于HTTP/2和Protobuf兼顾两者优势。选择建议：对外服务用HTTP RESTful，内部服务间高频调用用RPC。微服务内部可统一使用一种RPC框架如Dubbo或gRPC。"
+  },
+  {
+    "category": "Spring Cloud & 微服务",
+    "question": "分布式系统和微服务有什么区别？",
+    "keywords": "概念对比、架构演进",
+    "answer": "分布式系统和微服务是不同层次的概念。分布式系统是将任务分布在多台计算机上协调完成的系统架构，强调的是系统的物理部署方式。微服务是一种架构风格将应用拆分为一组小型独立服务各自负责特定业务功能通过轻量级协议通信。关系：微服务是分布式系统的一种实现方式。微服务必然是分布式系统，但分布式系统不一定是微服务。对比：分布式系统关注如何将计算分布到多台机器解决性能、可靠性等问题。微服务关注如何将业务功能拆分为独立服务解决组织架构、代码耦合、独立部署等问题。SOA（面向服务架构）是微服务的前身，微服务是SOA的简化和细化。微服务特点：服务自治、去中心化治理、独立部署、轻量级通信。分布式系统特点：数据分布、计算分布、透明性。两者在现代架构中经常结合使用。"
+  },
+  {
+    "category": "消息队列",
+    "question": "为什么需要消息队列？",
+    "keywords": "异步、解耦、削峰",
+    "answer": "消息队列的三大核心价值。异步处理：用户注册后需要发送邮件、短信、积分等操作，使用MQ后主流程只需写入消息队列即可返回，消费者异步处理提升响应速度。服务解耦：订单系统需要通知库存、物流、积分等多个系统，使用MQ后订单系统只负责发消息不关心谁消费，新增或移除消费者只需订阅或取消订阅无需修改订单系统。流量削峰：秒杀场景下大量请求涌入，MQ作为缓冲层将请求排队处理，后端服务按自己的处理能力消费消息避免系统被打垮。其他价值：数据广播、事件驱动架构、日志收集。引入MQ的代价：系统复杂度增加（消息丢失、重复消费、顺序性）；可用性降低（MQ宕机影响整体）；一致性问题（分布式事务）。使用前需评估必要性不是所有场景都需要MQ。"
+  },
+  {
+    "category": "消息队列",
+    "question": "消息队列有哪些模型？",
+    "keywords": "点对点、发布订阅、Topic、Queue",
+    "answer": "消息队列的两种核心模型。点对点模型（Queue）：消息只有一个消费者消费后即从队列删除。生产者发送消息到队列，消费者从队列拉取消息，保证每条消息只被消费一次。适用于任务分发场景如工作队列。发布订阅模型（Topic）：消息可以被多个消费者同时消费，每个消费者独立接收消息的副本。生产者发布消息到Topic，所有订阅了该Topic的消费者都能收到。适用于广播通知场景如配置变更。不同MQ的实现差异：RabbitMQ通过Exchange和Binding将消息路由到不同Queue实现发布订阅。Kafka通过Topic和Consumer Group实现，同一组内消费者竞争消费（点对点），不同组独立消费（发布订阅）。RocketMQ通过Topic和ConsumerGroup实现类似Kafka的模型。选择模型时需要根据业务需求确定是一对一还是一对多的消费关系。"
+  },
+  {
+    "category": "消息队列",
+    "question": "RabbitMQ如何实现延迟队列？",
+    "keywords": "TTL+死信交换机、延迟插件",
+    "answer": "RabbitMQ实现延迟队列的两种方式。TTL加死信交换机方案：创建一个队列设置消息TTL（过期时间），该队列绑定到死信交换机（DLX），DLX再绑定到目标队列。消息发送到TTL队列后等待过期，过期后自动路由到DLX再到目标队列，消费者从目标队列消费。此方案简单但每个TTL队列只能设置一个延迟时间，多个延迟时间需要创建多个队列。RabbitMQ延迟插件（rabbitmq_delayed_message_exchange）：安装插件后创建延迟类型Exchange，发送消息时指定延迟时间（headers中设置x-delay），消息在Exchange中等待指定时间后再路由到Queue。此方案更灵活支持不同的延迟时间。实际应用：订单超时取消（30分钟）、定时任务调度、消息重试延迟。注意：TTL方案中消息堆积在队列头部时即使后续消息已过期也不会提前出队（队列级TTL除外），3.8+版本支持per-message TTL。"
+  },
+  {
+    "category": "消息队列",
+    "question": "什么是死信交换机？有什么作用？",
+    "keywords": "DLX、消息拒绝、TTL过期",
+    "answer": "死信交换机（Dead Letter Exchange，DLX）是RabbitMQ处理异常消息的机制。当消息变成死信（Dead Letter）时会被路由到绑定的死信交换机再到死信队列。消息变死信的三种情况：消息被消费者拒绝（basic.reject或basic.nack）且不重新入队（requeue=false）。消息的TTL过期。队列达到最大长度（x-max-length）最早的消息被丢弃。配置方式：在声明Queue时通过x-dead-letter-exchange指定DLX，x-dead-letter-routing-key指定路由键。实际应用场景：延迟队列（TTL加DLX实现）、异常消息收集（拒绝的消息进入死信队列后续人工处理）、消息审计和日志记录、消息重试（消费失败后进入死信队列由专门消费者处理重试逻辑）。死信队列的消息可以被重新消费或存储到数据库做后续处理。处理死信消息的策略需要根据业务场景设计。"
+  },
+  {
+    "category": "消息队列",
+    "question": "消息无法路由到任何队列怎么办？",
+    "keywords": "mandatory、备份交换机",
+    "answer": "当消息发送到Exchange后无法路由到任何绑定的Queue时的处理方式。mandatory参数：生产者发送消息时设置mandatory=true，当消息无法路由到任何队列时RabbitMQ会将消息返回给生产者（通过basic.return机制）。生产者需要实现ReturnListener回调处理退回的消息，可以选择记录日志、重新发送或存储到数据库。备份交换机（Alternate Exchange）：在声明Exchange时通过alternate-exchange属性指定备份交换机。当消息无法路由到任何绑定队列时自动路由到备份交换机对应的队列。备份交换机类型通常使用fanout确保接收所有未路由消息。两种方案对比：mandatory适合需要程序化处理的场景但需要生产者实现回调逻辑。备份交换机更简单自动将未路由消息存入指定队列但缺少灵活性。最佳实践：生产环境建议同时使用两种方案，mandatory处理关键业务消息的路由失败，备份交换机兜底所有未路由消息。"
+  },
+  {
+    "category": "消息队列",
+    "question": "RocketMQ为什么不用Zookeeper做注册中心？",
+    "keywords": "AP vs CP、性能、架构设计",
+    "answer": "RocketMQ选择NameServer而非Zookeeper作为注册中心的原因。CAP理论角度：Zookeeper是CP系统保证一致性但可用性受限（Leader选举期间不可用），NameServer是AP系统各节点独立工作互不影响高可用。性能角度：NameServer是无状态的简单HTTP服务内存中维护路由信息，单机可支撑极高QPS。Zookeeper的ZAB协议和持久化机制增加了额外开销。架构设计：NameServer设计简单每个节点独立运行不相互同步，Broker启动时向所有NameServer注册，客户端也向所有NameServer查询路由信息。这种设计虽然可能导致短暂的数据不一致（各节点信息不同步）但对路由发现场景足够。Zookeeper的一致性对配置管理和服务协调更合适但对服务发现来说过于重量级。RocketMQ的NameServer去中心化设计使其更轻量、更稳定、更适合高并发的生产环境。"
+  },
+  {
+    "category": "消息队列",
+    "question": "RocketMQ事务消息的实现原理？",
+    "keywords": "半消息、本地事务、回查机制",
+    "answer": "RocketMQ事务消息实现分布式事务的最终一致性。流程：生产者发送半消息（Half Message）到Broker，Broker收到后将消息存储但不对消费者可见（暂存消息队列）。生产者执行本地事务（如数据库操作）。本地事务成功则发送Commit消息使消息对消费者可见；失败则发送Rollback消息删除消息。问题：如果Commit或Rollback消息丢失怎么办？RocketMQ提供事务回查机制：Broker定期对half状态的消息向生产者发起回查，生产者根据本地事务状态回复Commit或Rollback。回查次数默认15次。实现：生产者实现TransactionListener接口的executeLocalTransaction（执行本地事务）和checkLocalTransaction（回查方法）。使用@TransactionalHalfMessage注解简化开发。适用场景：订单创建与库存扣减、支付与积分发放等需要保证最终一致性的分布式事务。注意事项：回查方法要保证幂等性；本地事务要与消息发送在同一个JVM中。"
+  },
+  {
+    "category": "消息队列",
+    "question": "如何保证消息的幂等性？",
+    "keywords": "唯一ID、去重表、业务去重",
+    "answer": "消息幂等性指同一条消息被多次消费不会产生副作用。为什么需要：网络抖动导致消息重试、消费端处理超时触发重试、MQ本身的消息重投递。解决方案：唯一消息ID去重，每条消息携带全局唯一ID（UUID或雪花算法），消费端维护去重表（Redis或数据库），消费前检查ID是否已处理。Redis原子操作：使用SETNX设置消息ID为key并设置过期时间，设置成功则消费否则跳过。数据库唯一索引：去重表对消息ID建唯一索引，插入成功则消费否则跳过。业务幂等设计：让业务本身具有幂等性，如使用INSERT ON DUPLICATE KEY UPDATE、SET操作天然幂等、UPDATE WHERE version=N版本号控制。消费确认（ACK）：手动确认消息只有处理成功才提交确认。幂等方案选择：简单场景用Redis去重，高可靠场景用数据库去重表加业务幂等双重保证。注意去重表要定期清理避免无限增长。"
+  },
+  {
+    "category": "消息队列",
+    "question": "如何保证消息的顺序性？",
+    "keywords": "分区有序、全局有序、队列设计",
+    "answer": "消息顺序性分为全局有序和分区有序。全局有序：所有消息严格按发送顺序消费，通过单队列单消费者实现，但吞吐量极低通常不推荐。分区有序（推荐）：同一业务键（如订单ID）的消息按顺序消费。实现方式：生产者端将相同业务键的消息发送到同一个Queue（通过MessageQueueSelector选择）。消费者端单线程顺序消费或使用MessageListenerOrderly保证同一队列的顺序消费。Kafka中同一Partition内的消息是有序的，生产者指定相同的Partition Key确保相同业务键进入同一Partition。RabbitMQ中同一Queue的消息是有序的。常见场景：订单状态变更必须按顺序处理、数据库Binlog同步。注意事项：顺序消费会降低消费速度需要权衡顺序性和吞吐量；消费者内部如果有多线程处理仍可能乱序；消费失败的重试策略需要特别设计避免阻塞后续消息。"
+  },
+  {
+    "category": "消息队列",
+    "question": "消息队列中的消息堆积怎么处理？",
+    "keywords": "扩容消费者、优化消费逻辑、紧急处理",
+    "answer": "消息堆积指生产速度远大于消费速度导致消息在队列中积压。影响：消费延迟增大、可能触发消息过期、占用磁盘或内存。紧急处理方案：快速扩容消费者数量，增加Consumer实例并确保分区或队列数量足够（分区数需大于等于消费者数）。跳过非关键消息，对可忽略的消息做丢弃处理先保证核心消息消费。临时队列转发，将堆积消息转发到临时Topic由大量临时消费者并行处理后再回写。根本解决方案：优化消费逻辑，减少IO操作、批量处理、异步化非关键操作。增加分区或队列数，提高并行消费能力。合理设置消费线程数（注意数据库连接池限制）。监控预警：设置消费延迟监控告警（如RocketMQ的消费延迟告警）。预防措施：评估正常消费能力确保能匹配生产速度；在消费端做好限流保护数据库等下游服务。消息堆积是生产环境常见问题需要提前设计应对方案。"
+  },
+  {
+    "category": "消息队列",
+    "question": "如何保证消息不丢失？",
+    "keywords": "生产者确认、持久化、消费者ACK",
+    "answer": "消息不丢失需要在三个环节保证。生产者端：使用事务消息（RocketMQ）或Confirm机制（RabbitMQ）确保消息成功发送到Broker。RabbitMQ的publisher-confirm模式下消息到达Broker后回调确认。Kafka设置acks=all确保所有ISR副本都确认。Broker端：消息持久化到磁盘。RabbitMQ设置队列和消息为持久化（durable=true, deliveryMode=2）。Kafka设置replication-factor大于等于2且min.insync.replicas大于等于2，消息写入所有同步副本后才算成功。RocketMQ同步刷盘加同步复制保证消息不丢失。消费者端：使用手动ACK（auto-ack=false）确保消息处理成功后再确认。处理失败重新投递。Kafka设置enable.auto.commit=false手动提交offset。注意：消息不丢失和性能之间存在权衡，同步刷盘和acks=all会降低吞吐量。需要根据业务场景选择合适的一致性级别。"
+  },
+  {
+    "category": "消息队列",
+    "question": "消息队列中推模式和拉模式的区别？",
+    "keywords": "Push vs Pull、实时性、消费控制",
+    "answer": "推模式（Push）：Broker主动将消息推送给消费者。优点：实时性高消息到达立即消费。缺点：消费者处理能力弱时可能被压垮；消费者难以控制消费速率；可能导致消息堆积在消费者端。代表：RabbitMQ的basic.consume推送消息，RocketMQ的PushConsumer。拉模式（Pull）：消费者主动从Broker拉取消息。优点：消费者完全控制消费速率可以根据自身能力拉取；适合批量处理。缺点：实时性取决于拉取间隔；拉取过于频繁增加网络开销；拉取间隔过长导致消费延迟。代表：Kafka的Consumer主动poll消息。实际实现：大多数MQ采用混合模式。RocketMQ的PushConsumer底层也是轮询拉取（长轮询）。Kafka虽然API是Pull但通过长轮询（long polling）实现了接近Push的实时性。选择建议：实时性要求高用Push，需要精细控制消费速率用Pull，大多数场景框架的默认Push模式足够。"
+  },
+  {
+    "category": "消息队列",
+    "question": "为什么Kafka要抛弃Zookeeper？",
+    "keywords": "KRaft、自治、运维简化",
+    "answer": "Kafka从3.0开始移除对Zookeeper的依赖采用KRaft（Kafka Raft）模式。原因：运维复杂性：额外维护Zookeeper集群增加了部署和运维成本。扩展性瓶颈：Zookeeper的写操作是串行的，集群元数据管理可能成为瓶颈。启动慢：Kafka依赖Zookeeper才能启动，Zookeeper故障时Kafka无法工作。一致性延迟：Broker与Zookeeper之间的状态同步存在延迟。KRaft模式改进：使用Raft共识协议替代Zookeeper进行元数据管理，Controller节点通过Raft选举产生。所有元数据存储在Kafka自身的Topic（__cluster_metadata）中。优势：单进程即可运行（无需独立Zookeeper）；启动速度更快；元数据同步更高效（ISR机制）；运维更简单。KRaft模式支持最多100万Topic的元数据管理。Kafka 3.3+推荐生产使用KRaft模式，Kafka 4.0将完全移除Zookeeper支持。迁移方案：通过kafka-metadata-quorum工具从ZK模式迁移到KRaft模式。"
+  },
+  {
+    "category": "消息队列",
+    "question": "Kafka和Zookeeper各自的作用是什么？",
+    "keywords": "Kafka负责消息、ZK负责协调",
+    "answer": "在传统Kafka架构中（非KRaft模式）。Kafka Broker的角色：消息的存储和传输。负责接收生产者的消息写入磁盘Topic-Partition中。消费者通过Poll拉取消息。提供高吞吐量的消息服务。核心特性：顺序写磁盘、零拷贝、页缓存、批量发送。Zookeeper的角色：Broker注册和元数据管理。所有Broker启动时向ZK注册，Controller监听ZK节点变化管理Broker上下线。Topic和Partition管理。Topic的创建删除、Partition的Leader选举由Controller负责，Controller通过ZK协调。配置管理：存储动态配置信息如Topic级别的配置覆盖。消费者协调：Consumer Group的Rebalance通过ZK（旧版本）或GroupCoordinator（新版本）完成。Controller选举：多个Broker通过ZK竞争创建/controller节点成为Controller。ZK是Kafka集群的大脑管理元数据和协调工作。KRaft模式下这些功能由Kafka自身的Raft协议实现。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP三次握手的过程是什么？",
+    "keywords": "SYN、SYN+ACK、ACK",
+    "answer": "TCP三次握手建立连接的过程。第一次握手：客户端发送SYN包（seq=x）到服务器进入SYN_SENT状态，表示请求建立连接。第二次握手：服务器收到SYN后回复SYN+ACK包（seq=y, ack=x+1）进入SYN_RCVD状态，表示同意建立连接。第三次握手：客户端收到SYN+ACK后发送ACK包（ack=y+1）进入ESTABLISHED状态，服务器收到后也进入ESTABLISHED状态，连接建立完成。为什么需要三次而不是两次：防止已失效的连接请求到达服务器导致错误建立连接。如果只有两次，客户端发送的第一个SYN延迟到达服务器，服务器会误以为是新连接而建立连接等待客户端发送数据但实际客户端不会发送造成资源浪费。第三次握手的ACK包可以携带数据，此时连接已经建立。三次握手后双方协商了初始序列号用于后续的数据传输和确认。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP四次挥手的过程是什么？",
+    "keywords": "FIN、ACK、FIN、ACK、TIME_WAIT",
+    "answer": "TCP四次挥手断开连接的过程。第一次挥手：主动关闭方发送FIN包（seq=u）进入FIN_WAIT_1状态，表示不再发送数据。第二次挥手：被动关闭方收到FIN后回复ACK包（ack=u+1）进入CLOSE_WAIT状态，主动方收到后进入FIN_WAIT_2状态。此时连接处于半关闭状态，被动方仍可发送数据。第三次挥手：被动关闭方发送完剩余数据后发送FIN包（seq=w）进入LAST_ACK状态。第四次挥手：主动关闭方收到FIN后回复ACK包（ack=w+1）进入TIME_WAIT状态等待2MSL（最大报文段生存时间）后关闭。被动方收到ACK后立即关闭。为什么四次：TCP是全双工的每个方向需要单独关闭。FIN只能表示发送方不再发送数据但接收方可能还有数据未发完。TIME_WAIT等待2MSL的原因：确保最后一个ACK到达服务器；防止旧连接的延迟报文干扰新连接。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP协议解决了什么问题？",
+    "keywords": "可靠传输、流量控制、拥塞控制",
+    "answer": "TCP解决的核心问题：可靠数据传输。通过序列号和确认应答（ACK）机制保证数据不丢失不重复。超时重传机制在网络丢包时重新发送数据。流量控制。通过滑动窗口机制让接收方控制发送方的发送速率避免接收方缓冲区溢出。接收方在ACK中通告窗口大小（rwnd），发送方的数据量不超过接收窗口。拥塞控制。通过慢启动、拥塞避免、快重传、快快恢复四个算法控制网络中的数据量避免网络拥塞。维护拥塞窗口（cwnd）在网络状况好时逐步增大在丢包时减小。有序性。通过序列号对数据包进行排序保证数据按序到达应用层。字节流服务。TCP是面向字节流的协议将应用层数据视为无结构的字节流提供可靠的字节级传输。连接管理。通过三次握手建立连接四次挥手释放连接。TCP适用于需要可靠传输的场景如HTTP、FTP、邮件等。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP和UDP有什么区别？",
+    "keywords": "可靠性、连接、速度",
+    "answer": "TCP和UDP的主要区别。连接方式：TCP是面向连接的通信前需三次握手建立连接；UDP是无连接的直接发送数据。可靠性：TCP通过序列号、ACK、重传等机制保证可靠传输；UDP不保证数据到达也不保证顺序。传输方式：TCP是面向字节流的将数据视为无结构的字节流；UDP是面向报文的保留应用层消息边界。速度：TCP因为连接管理、确认应答、拥塞控制等开销速度较慢；UDP没有这些开销速度更快。头部大小：TCP头部20字节（可扩展到60字节）；UDP头部只有8字节。适用场景：TCP适用于HTTP、FTP、SMTP等需要可靠传输的应用；UDP适用于DNS、视频流、游戏、直播等对实时性要求高可以容忍少量丢包的场景。现代应用中QUIC协议基于UDP实现了类似TCP的可靠性同时保持低延迟。UDP也用于局域网内的快速数据传输。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "什么是TCP的超时重传机制？",
+    "keywords": "RTT、RTO、快速重传",
+    "answer": "超时重传是TCP保证可靠传输的核心机制。基本原理：发送方发送数据后启动定时器，如果在超时时间内未收到对应ACK则重新发送该数据包。超时时间（RTO）的计算基于往返时间（RTT）。RTT是数据包发出到收到ACK的时间间隔。RTO通过加权平均计算：SRTT = (1-a) * SRTT + a * RTTsample，RTO = SRTT + max(G, K * RTTVAR)，其中G为时钟粒度，K=4。快速重传：收到三个重复ACK时立即重传而不必等待超时。这比超时重传更快因为三个重复ACK说明有包丢失。选择性确认（SACK）：允许接收方告知发送方哪些数据段已收到，发送方只重传丢失的部分而非大量重复数据。超时重传的优化：Linux内核使用更精确的RTT测量和RTO计算算法。超时时间不能设置太短（频繁不必要的重传）也不能太长（恢复延迟）。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP/IP四层模型是什么？",
+    "keywords": "应用层、传输层、网络层、网络接口层",
+    "answer": "TCP/IP四层模型从上到下。应用层：直接为用户提供网络服务，协议包括HTTP、HTTPS、FTP、SMTP、DNS、Telnet等。应用层数据称为报文（Message）。传输层：提供端到端的通信服务，核心协议TCP（可靠传输）和UDP（不可靠传输）。传输层数据称为段（Segment）或数据报（Datagram）。网络层：负责数据包从源到目的的路由转发，核心协议IP（Internet Protocol）、ICMP（Ping）、ARP（地址解析）。网络层数据称为包（Packet）。网络接口层（链路层）：负责同一网络内节点间的数据传输，协议包括以太网（Ethernet）、Wi-Fi等。网络接口层数据称为帧（Frame）。数据封装过程：应用层数据逐层添加头部信息，经过传输层（添加TCP或UDP头）到网络层（添加IP头）到网络接口层（添加帧头帧尾）到物理传输。接收方逐层解封装还原数据。每层只与相邻层交互实现关注点分离。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "OSI七层模型是什么？",
+    "keywords": "物理层到应用层",
+    "answer": "OSI（开放式系统互联）七层模型从下到上。物理层：定义电气信号、光信号、物理接口规范，传输比特流。设备：集线器、中继器。数据链路层：将比特流组织成帧，提供节点到节点的传输。协议：以太网、PPP。设备：交换机、网桥。网络层：提供路由和转发功能，实现不同网络间的数据传输。协议：IP、ICMP、OSPF。设备：路由器。传输层：提供端到端的可靠或不可靠传输。协议：TCP、UDP。会话层：管理应用程序间的会话建立、维护和终止。表示层：数据格式转换、加密解密、压缩解压。应用层：直接为用户的应用程序提供网络服务。协议：HTTP、FTP、SMTP。OSI模型是理论参考模型，实际中TCP/IP四层模型更常用。OSI的会话层和表示层功能通常由应用层自行实现。学习OSI模型有助于理解网络通信的分层架构。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "什么是TCP的滑动窗口？",
+    "keywords": "发送窗口、接收窗口、流量控制",
+    "answer": "滑动窗口是TCP实现流量控制和可靠传输的核心机制。发送窗口：发送方维护的窗口大小表示当前可以发送但尚未确认的数据量。窗口内的数据可以发送不需要等待ACK，窗口外的数据必须等待。接收窗口：接收方通过ACK中的Window字段告知发送方自己的缓冲区剩余空间，发送方的发送量不超过接收窗口大小。窗口滑动：当收到ACK时发送窗口向右滑动新的数据进入可发送范围。零窗口：当接收方缓冲区满时通告窗口大小为0，发送方停止发送数据并启动持续计时器定期探测窗口是否恢复。糊涂窗口综合症（Silly Window Syndrome）：接收方窗口小时通告导致发送方发送小数据效率低，解决方案是接收方等到缓冲区有足够空间再通告。滑动窗口使TCP可以连续发送多个数据包而不必逐个等待ACK大大提高了传输效率。窗口大小根据网络状况和接收方能力动态调整。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP的TIME_WAIT状态的作用和问题？",
+    "keywords": "2MSL、端口耗尽、连接复用",
+    "answer": "TIME_WAIT状态出现在主动关闭连接方在发送最后一个ACK后等待2MSL（Maximum Segment Lifetime，通常60秒）的阶段。作用：确保最后一个ACK能到达对方。如果ACK丢失对方会重传FIN，TIME_WAIT状态可以重新发送ACK。防止旧连接的延迟报文干扰新连接。等待2MSL确保网络中属于旧连接的所有报文都已消失。问题：高并发短连接场景下大量TIME_WAIT状态占用端口资源导致可用端口耗尽。解决方法：启用TCP长连接复用（HTTP Keep-Alive）减少短连接数量。调整内核参数net.ipv4.tcp_tw_reuse=1允许复用TIME_WAIT连接（仅对客户端有效）。net.ipv4.tcp_tw_recycle=1快速回收TIME_WAIT（但在NAT环境下有问题不推荐）。SO_REUSEADDR选项允许重用处于TIME_WAIT状态的地址。使用连接池管理连接避免频繁创建销毁。server端通常主动关闭连接较少遇到TIME_WAIT问题，客户端（如HTTP客户端）更容易出现。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "HTTP 1.0和HTTP 1.1有什么区别？",
+    "keywords": "长连接、Host头、缓存",
+    "answer": "HTTP 1.1相比1.0的主要改进。长连接（Persistent Connection）：1.0每次请求或响应后关闭TCP连接；1.1默认开启Keep-Alive复用同一TCP连接发送多个请求或响应减少建立连接的开销。Host头：1.0不要求Host头一个IP只能对应一个网站；1.1要求必须携带Host头支持虚拟主机（同一IP多个域名）。分块传输编码（Chunked Transfer Encoding）：1.1支持将响应分块发送而不需要Content-Length。缓存控制：1.0使用Expires和Last-Modified或If-Modified-Since；1.1增加了Cache-Control、ETag、If-None-Match等更细粒度的缓存控制。断点续传：1.1支持Range请求头实现部分请求和响应。其他改进：新增PUT、DELETE、OPTIONS等方法；100 Continue状态码；管道化（Pipelining）支持（虽然后来被HTTP/2的多路复用替代）。HTTP 1.1是目前使用最广泛的HTTP版本。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "HTTP 2.0和HTTP 1.1有什么区别？",
+    "keywords": "多路复用、头部压缩、服务端推送",
+    "answer": "HTTP/2相比1.1的核心改进。二进制分帧层：1.1是文本协议；2.0将请求和响应拆分为二进制帧（Frame），帧是通信的最小单位，提高了编解码效率。多路复用（Multiplexing）：1.1的管道化存在队头阻塞问题；2.0在同一TCP连接上并行发送多个请求或响应的帧，帧通过Stream ID区分彻底解决了队头阻塞。头部压缩：1.1每次请求都携带完整头部（包含大量重复的Cookie等）；2.0使用HPACK算法对头部进行压缩，维护静态和动态索引表减少冗余传输。服务端推送（Server Push）：服务器可以主动推送资源到客户端浏览器如推送CSS、JS文件减少请求次数。流优先级：允许为请求或响应设置优先级确保重要资源优先传输。HTTP/2需要TLS 1.2+支持（浏览器强制），解决了HTTP/1.1的性能瓶颈。基于SPDY协议发展而来。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "HTTP 2.0和HTTP 3.0有什么区别？",
+    "keywords": "QUIC协议、UDP、0-RTT",
+    "answer": "HTTP/3基于QUIC协议运行在UDP之上而非TCP。核心改进：解决队头阻塞。HTTP/2虽然实现了多路复用但底层TCP的丢包会阻塞整个连接（TCP队头阻塞）。QUIC基于UDP每个流（Stream）独立互不影响，一个流的丢包不会阻塞其他流。0-RTT建连。QUIC将TLS握手与传输层握手合并首次连接1-RTT，后续连接可实现0-RTT恢复（将加密密钥缓存在客户端）。TCP加TLS 1.2需要3-RTT。连接迁移。TCP连接基于四元组（源IP、源端口、目的IP、目的端口），网络切换（如WiFi到4G）需要重新建立连接。QUIC使用Connection ID标识连接网络切换时连接不中断。前向纠错（FEC）。QUIC支持在数据包中添加冗余信息接收方可以从部分丢失的数据中恢复原始数据减少重传。改进的拥塞控制。基于UDP可以实现更灵活的拥塞控制算法。HTTP/3需要客户端和服务器都支持QUIC协议。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "HTTP和HTTPS有什么区别？",
+    "keywords": "TLS/SSL、加密、证书",
+    "answer": "HTTPS = HTTP + TLS/SSL加密。主要区别：安全性。HTTP明文传输数据可被中间人窃听和篡改；HTTPS通过对称加密（AES）传输数据非对称加密（RSA或ECDHE）交换密钥保证数据的机密性和完整性。证书机制。HTTPS需要CA颁发的数字证书验证服务器身份，防止DNS劫持和中间人攻击。握手过程。HTTPS需要额外的TLS握手（通常1到2个RTT），HTTP无需握手直接传输。端口不同。HTTP使用80端口，HTTPS使用443端口。性能。HTTPS因加密解密操作有性能开销但现代CPU的AES-NI指令集和TLS 1.3的优化已大幅降低开销。SEO。Google等搜索引擎优先收录HTTPS站点。HTTP/2只支持HTTPS（浏览器强制）。TLS 1.3相比1.2简化了握手过程减少了RTT。现代Web应用强烈建议全站HTTPS。Let's Encrypt提供免费的SSL证书。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "Cookie、Session和Token有什么区别？",
+    "keywords": "存储位置、状态管理、适用场景",
+    "answer": "Cookie：存储在客户端浏览器中，每次请求自动携带。可用于存储用户偏好、会话ID等。大小限制约4KB，可设置过期时间、域、路径、安全等属性。存在CSRF攻击风险。Session：存储在服务端（内存或Redis或数据库），客户端通过Cookie中的SessionID关联。安全性更高因为敏感数据存在服务端。但服务端需要存储会话状态，在分布式环境下需要共享Session（如存在Redis中）。每次请求需要查询Session。Token（如JWT）：服务端生成的加密字符串，客户端存储后每次请求在Header中携带。服务端无状态不需要存储会话数据，天然支持分布式架构。包含用户信息和过期时间，可自验证。但Token通常较大增加网络传输开销，无法主动失效（需要配合黑名单机制）。选择建议：传统Web应用可用Session+Cookie；移动端和微服务架构推荐JWT Token。Token适合无状态架构，Session适合有状态的传统架构。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "Select、Poll和Epoll有什么区别？",
+    "keywords": "IO多路复用、fd限制、通知方式",
+    "answer": "三种IO多路复用机制。Select：POSIX标准，fd数量受FD_SETSIZE限制（通常1024）。每次调用都需要将fd集合从用户态拷贝到内核态，内核遍历所有fd检查是否就绪，就绪后也需要遍历找出哪些fd就绪，时间复杂度O(n)。fd集合每次调用都需要重新设置（FD_ZERO和FD_SET）。Poll：与Select类似但使用pollfd数组替代位图，没有fd数量的硬限制（受系统限制），但仍然是遍历方式O(n)。每次调用仍需拷贝数据。Epoll（Linux特有）：使用红黑树管理fd，通过epoll_ctl添加或删除或修改fd只在添加时拷贝一次。就绪事件通过回调机制添加到就绪链表，epoll_wait只返回就绪的fd无需遍历，时间复杂度O(1)（就绪事件数）。支持ET（边缘触发）和LT（水平触发）两种模式。ET模式在状态变化时通知一次性能更高但编程更复杂。Select和Poll是跨平台的，Epoll是Linux特有的。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "TCP的粘包和拆包问题是什么？",
+    "keywords": "字节流、消息边界、解决方案",
+    "answer": "TCP是面向字节流的协议不保留消息边界。粘包：多个小消息合并成一个TCP报文发送。原因：Nagle算法合并小数据包、发送方缓冲区合并、网络合并。拆包：一个大消息被拆分成多个TCP报文发送。原因：消息大小超过MSS（最大报文段大小）、发送方缓冲区限制。TCP不关心消息边界只保证字节流的可靠传输。解决方案：固定长度：每个消息固定长度不足补空格简单但浪费带宽。分隔符：消息间使用特殊分隔符（如换行符）但需要转义。长度前缀：消息前添加长度字段接收方先读取长度再读取对应长度的数据。这是最常用的方案。Netty提供了LengthFieldBasedFrameDecoder等处理器自动处理粘包拆包。应用层协议需要自定义消息格式确保正确解析。HTTP/1.1通过Content-Length和Transfer-Encoding: chunked解决。HTTP/2通过帧头中的长度字段解决。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "建立一个TCP连接需要经历什么？",
+    "keywords": "三次握手、四元组、状态转换",
+    "answer": "建立TCP连接需要经历三次握手。完整过程：客户端创建Socket调用connect()触发三次握手。客户端发送SYN包进入SYN_SENT状态。服务器收到后分配资源（发送缓冲区、接收缓冲区、连接控制块等）回复SYN+ACK进入SYN_RCVD状态。客户端收到后发送ACK进入ESTABLISHED状态服务器收到后也进入ESTABLISHED状态。连接建立后双方可以收发数据。TCP连接由四元组唯一标识：源IP、源端口、目的IP、目的端口。同一个服务器可以同时维护多个连接（不同源端口或源IP）。连接资源：内核需要分配发送缓冲区、接收缓冲区、控制块等内存资源。SYN Flood攻击通过大量伪造SYN耗尽服务器资源。防护措施：SYN Cookie（不分配资源直到ACK到达）、限制SYN频率。连接建立后通过SO_SNDBUF和SO_RCVBUF调整缓冲区大小。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "常见的IO模型有哪些？",
+    "keywords": "阻塞IO、非阻塞IO、IO多路复用、异步IO",
+    "answer": "Unix系统五种IO模型。阻塞IO（BIO）：read系统调用在数据未就绪时阻塞线程直到数据到达用户空间。简单但每个连接需要一个线程。非阻塞IO（NIO）：read在数据未就绪时立即返回EAGAIN或EWOULDBLOCK，应用需要轮询。不阻塞但浪费CPU。IO多路复用：select或poll或epoll同时监听多个fd，某个fd就绪后再进行read操作。一个线程管理多个连接是Netty的核心模型。异步IO（AIO）：发起read后立即返回，内核完成数据拷贝后通过回调或信号通知应用。真正异步但Linux实现不完善。信号驱动IO：通过SIGIO信号通知应用fd就绪。Java中的对应：BIO对应java.io，NIO对应java.nio（Selector、Channel、Buffer），Netty是NIO的封装，AIO对应java.nio.channels.AsynchronousChannel（Linux底层用epoll模拟效果不佳）。生产环境推荐NIO或Netty处理高并发连接。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "输入一个网址到页面显示经历了什么？",
+    "keywords": "DNS、TCP、HTTP、渲染",
+    "answer": "完整流程：DNS解析：浏览器检查缓存、操作系统缓存、hosts文件、递归查询DNS服务器将域名解析为IP地址。TCP连接：通过三次握手与服务器建立TCP连接（如果HTTPS还需要TLS握手）。发送HTTP请求：构建HTTP请求报文（请求行、请求头、请求体）发送给服务器。服务器处理请求：Nginx接收、反向代理、应用服务器处理、查询数据库、生成响应。服务器返回响应：构建HTTP响应报文（状态码、响应头、响应体）。浏览器渲染：解析HTML构建DOM树、解析CSS构建CSSOM、合并为渲染树、布局（Layout）计算位置大小、绘制（Paint）、合成（Composite）。后续：加载JavaScript并执行、根据需要发起额外请求（图片、CSS、JS等）、触发重排或重绘。整个过程涉及DNS、TCP/IP、HTTP、浏览器渲染等多个技术领域。性能优化可以在DNS预解析、TCP快速打开、HTTP缓存、CDN加速、资源压缩等环节入手。"
+  },
+  {
+    "category": "网络 & 计算机基础",
+    "question": "线程和进程有什么区别？",
+    "keywords": "资源分配、独立性、上下文切换",
+    "answer": "进程是操作系统资源分配的基本单位，线程是CPU调度的基本单位。资源方面：进程拥有独立的地址空间、文件描述符、信号处理等资源；线程共享进程的资源（代码段、数据段、堆内存），只有栈和寄存器是独立的。独立性：进程间相互隔离一个进程崩溃不影响其他进程；线程共享内存一个线程崩溃可能导致整个进程崩溃。上下文切换：进程切换需要切换内存映射（页表）开销大；线程切换只需切换栈和寄存器开销小。创建销毁：进程创建需要分配资源开销大；线程创建只需分配栈空间开销小。通信方式：进程间通信需要IPC（管道、消息队列、共享内存、Socket等）；线程间直接读写共享变量。Java中一个JVM实例是一个进程，GC线程、编译线程和业务线程共享堆内存。并发编程中通常使用多线程而非多进程。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty的零拷贝是什么？",
+    "keywords": "mmap、sendfile、CompositeByteBuf",
+    "answer": "Netty的零拷贝体现在多个层面。操作系统的零拷贝：传统文件传输需要4次拷贝（磁盘到内核缓冲区到用户缓冲区到socket缓冲区到网卡），使用mmap将内核缓冲区映射到用户空间减少一次拷贝。sendfile系统调用可以直接将文件数据从内核缓冲区发送到网卡完全绕过用户空间。Netty的零拷贝：CompositeByteBuf将多个ByteBuf合并为一个逻辑上的ByteBuf而不需要实际数据拷贝。ByteBuf的slice操作创建视图不拷贝数据。Unpooled.wrappedBuffer将byte数组包装为ByteBuf不拷贝数据。FileRegion通过FileChannel.transferTo实现文件内容直接传输到Channel避免用户态拷贝。这些优化使得Netty在处理大数据传输和协议编码时性能极高。零拷贝减少了CPU的内存拷贝操作将CPU资源留给业务处理。在高吞吐量场景下零拷贝的优势非常明显。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty如何处理粘包和拆包？",
+    "keywords": "ByteToMessageDecoder、FrameDecoder",
+    "answer": "Netty通过ChannelHandlerPipeline中的解码器处理粘包拆包。核心解码器：LengthFieldBasedFrameDecoder（最常用）基于长度字段的帧解码器，配置帧长度字段的偏移量、长度、调整值等参数自动处理粘包拆包。DelimiterBasedFrameDecoder基于分隔符的帧解码器指定分隔符拆分消息。FixedLengthFrameDecoder固定长度帧解码器每固定长度拆分一帧。LineBasedFrameDecoder基于换行符的帧解码器。工作原理：继承ByteToMessageDecoder重写decode方法，将ByteBuf中的数据解析为完整的消息对象。Decoder维护读指针只消费已解析完成的数据剩余未完成的数据保留到下次channelRead调用。解码后的消息传递给Pipeline中的下一个Handler。编码器：MessageToByteEncoder将消息编码为ByteBuf发送。自定义协议解码：继承LengthFieldBasedFrameDecoder重写decode方法根据协议格式解析消息。建议在Pipeline最前面添加帧解码器确保后续Handler收到完整消息。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty的空轮询Bug是什么？",
+    "keywords": "epoll bug、Selector唤醒、重建Selector",
+    "answer": "Netty的空轮询Bug是JDK epoll实现的一个问题。在Linux系统中当select或select返回的就绪事件数为0但未超时时epoll会被错误地唤醒导致空轮询。表现为CPU使用率突然飙升到100%。原因：JDK的epoll在某些情况下（如Channel的fd被关闭后仍注册在epoll中）会发生EPOLLHUP事件导致epoll_wait立即返回但没有实际事件处理。Netty的解决方案（EpollEventLoop）：检测空轮询次数，每次epoll_wait未处理任何事件且未超时时计数器加1。计数器超过阈值（默认512次）则重建Selector：创建新的Selector将旧Selector上注册的Channel重新注册到新Selector关闭旧Selector。Netty 4.x开始使用自己的EpollEventLoop替代JDK的NIO EventLoop绕过了JDK的epoll bug。使用io.netty.transport.noNative=false开启原生Epoll支持（Linux）。这个Bug在JDK 9+中已修复。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty的Reactor模型是什么？",
+    "keywords": "单Reactor单线程、主从Reactor",
+    "answer": "Reactor模型是Netty的核心线程模型。单Reactor单线程：一个Reactor线程同时处理IO事件（accept、read、write）和业务逻辑。简单但无法利用多核CPU且业务逻辑阻塞会影响IO处理。适用于低并发场景。Reactor多线程：Reactor线程只负责IO事件（accept、read、write），业务逻辑交给Worker线程池处理。IO和业务分离提高了并发能力。主从Reactor多线程（Netty默认）：MainReactor（BossGroup）只负责处理新连接（accept事件），SubReactor（WorkerGroup）负责已建立连接的IO读写和业务处理。每个SubReactor是一个独立的EventLoop线程。Netty的线程模型：BossGroup默认1个线程处理客户端连接；WorkerGroup默认CPU核数乘2个线程处理IO和业务。EventLoop的单线程模型保证了Channel上的事件串行处理避免了并发问题。TaskQueue支持延迟任务和异步任务。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty有哪些应用场景？",
+    "keywords": "RPC框架、游戏服务器、IM、网关",
+    "answer": "Netty的典型应用场景：RPC框架底层通信。Dubbo、gRPC、Motan等RPC框架都基于Netty实现网络通信。Netty提供高性能、低延迟的TCP或UDP通信能力。即时通讯（IM）系统。微信、钉钉等IM系统的底层通信框架通常基于Netty实现。支持长连接、心跳检测、消息编解码。游戏服务器。实时性要求高的游戏服务器使用Netty处理玩家连接和游戏数据传输。自定义协议实现高频数据交换。API网关。Netty可作为高性能网关的底层框架处理大量并发HTTP请求。实现请求转发、负载均衡、认证鉴权等功能。物联网（IoT）设备通信。大量设备连接到服务器使用Netty的高并发能力处理海量连接。大数据传输。Hadoop、Spark等大数据框架内部使用Netty进行节点间数据传输。Netty的线程模型、内存管理、协议编解码等特性使其成为Java网络编程的事实标准。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty为什么性能高？",
+    "keywords": "NIO、内存管理、线程模型、零拷贝",
+    "answer": "Netty高性能的原因：基于NIO非阻塞IO，使用epoll或kqueue实现IO多路复用一个线程处理大量连接。Reactor线程模型，主从Reactor分离IO和业务处理，EventLoop单线程模型避免锁竞争。零拷贝，CompositeByteBuf合并、FileRegion文件传输等减少内存拷贝。内存池（PooledByteBufAllocator），基于jemalloc思想的内存池化管理减少GC压力和内存分配开销。对象池复用ByteBuf减少创建销毁开销。高效的序列化，支持Protobuf、Kryo等高效序列化框架。灵活的编解码器，Pipeline机制将协议解析拆分为多个Handler可组合复用。心跳检测机制，IdleStateHandler自动检测空闲连接释放资源。写缓冲区管理，WriteBufferWaterMark控制写缓冲区大小防止OOM。可配置的参数，包括线程数、内存分配器、SO_BACKLOG等均可按需调整。这些优化使得Netty能支撑数十万级并发连接。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty中使用了哪些设计模式？",
+    "keywords": "Reactor、Builder、责任链、工厂",
+    "answer": "Netty大量使用设计模式。Reactor模式：EventLoopGroup管理Reactor线程处理IO事件是Reactor模式的典型实现。责任链模式：ChannelPipeline将多个ChannelHandler串联起来处理入站和出站事件。每个Handler处理自己负责的部分并将事件传递给下一个。Builder模式：ServerBootstrap和Bootstrap使用链式调用配置参数如.group().channel().option().handler()等。工厂模式：EventLoopGroup的newChild方法创建EventLoop，ChannelFactory创建Channel。装饰器模式：ByteBuf的包装类如WrappedByteBuf增强功能。观察者模式：Promise和Future机制实现异步操作结果的通知和等待。策略模式：不同的EventLoop实现（NioEventLoop、EpollEventLoop）可替换。单例模式：Unpooled.EMPTY_BUFFER等不可变对象。适配器模式：MessageToByteEncoder等适配不同类型的消息编解码。这些设计模式的灵活运用使Netty架构清晰、可扩展性强。"
+  },
+  {
+    "category": "Netty",
+    "question": "Netty为什么不用Java NIO？",
+    "keywords": "API复杂、Bug、功能不完善",
+    "answer": "Netty封装了Java NIO而不是直接使用的原因。NIO API复杂：Java NIO的Selector、Channel、Buffer使用起来繁琐易出错，需要处理OP_ACCEPT、OP_READ、OP_WRITE、OP_CONNECT等多种事件类型，手动管理Buffer的读写位置和状态。Netty封装了这些复杂性提供简洁的API。JDK的Bug：NIO在Linux上有epoll bug（空轮询导致CPU 100%），在Windows上有其他实现问题。Netty通过自行实现EpollEventLoop和处理机制规避了JDK的Bug。功能不完善：NIO没有心跳检测机制需要手动实现。没有完善的编解码框架需要自行处理粘包拆包。没有灵活的线程模型需要手动管理线程池。没有内存池需要频繁分配释放Buffer。缺乏对SSL/TLS、WebSocket、HTTP等协议的支持。Netty在NIO基础上提供了：EventLoop线程模型、ChannelPipeline处理链、ByteBuf内存管理、编解码器框架、SSL支持、HTTP编解码等完整的网络编程解决方案。直接用NIO开发相当于重新造轮子。"
+  },
+  {
+    "category": "MyBatis",
+    "question": "MyBatis的插件原理是什么？",
+    "keywords": "拦截器链、动态代理、四大对象",
+    "answer": "MyBatis插件（拦截器）通过动态代理机制拦截四大核心对象的方法调用。四大可拦截对象：Executor（执行器负责SQL执行）、StatementHandler（语句处理器负责Statement操作）、ParameterHandler（参数处理器负责参数设置）、ResultSetHandler（结果集处理器负责结果映射）。插件原理：实现Interceptor接口并使用@Intercepts注解声明要拦截的方法。MyBatis启动时通过Configuration.addInterceptor注册插件到interceptorChain。执行SQL时Plugin.wrap()方法创建代理对象（JDK动态代理），代理对象的invoke方法中先执行插件逻辑再调用目标方法。多个插件形成责任链依次执行。典型插件应用：分页插件（PageHelper）拦截Executor的query方法自动添加分页SQL。性能监控插件记录SQL执行时间。乐观锁插件在UPDATE时自动添加版本号条件。开发插件时注意插件的执行顺序和对SQL的影响。"
+  },
+  {
+    "category": "MyBatis",
+    "question": "MyBatis中#{}和${}有什么区别？",
+    "keywords": "预编译、参数替换、SQL注入",
+    "answer": "#{}是预编译参数，MyBatis使用PreparedStatement的参数占位符（问号）替换，参数值通过set方法设置。安全：防止SQL注入因为参数值作为值而非SQL语句的一部分。会进行类型转换。${}是字符串替换，直接将参数值拼接到SQL语句中不做预编译处理。不安全：存在SQL注入风险。不做类型转换。使用场景：#{}用于参数值的传递如WHERE id = #{id}、INSERT VALUES(#{name})。${}用于动态表名、列名、ORDER BY等无法使用占位符的场景如ORDER BY ${column}、SELECT ${columns} FROM ${table}。使用${}时必须进行参数校验和白名单过滤防止SQL注入。MyBatis默认使用#{}，只有在确实需要动态SQL片段时才使用${}。面试重点：#{}是PreparedStatement预编译参数防注入，${}是字符串替换有注入风险。最佳实践：尽量用#{}必须用${}时加白名单校验。"
+  },
+  {
+    "category": "MyBatis",
+    "question": "MyBatis的缓存机制是怎样的？",
+    "keywords": "一级缓存、二级缓存",
+    "answer": "MyBatis提供两级缓存。一级缓存（SqlSession级别）：默认开启。同一个SqlSession中执行相同的查询直接返回缓存结果不查数据库。执行增删改操作或调用clearCache()后缓存失效。不同SqlSession的缓存互不共享。注意：Spring集成MyBatis时每个Mapper方法默认开启新SqlSession执行完关闭，因此一级缓存作用范围有限。二级缓存（Mapper级别）：需要手动开启（在Mapper XML中添加cache标签）。同一个Mapper的多个SqlSession共享。SqlSession关闭或提交后才将数据写入二级缓存（避免脏读）。使用LRU淘汰策略。跨Mapper的二级缓存不共享。注意事项：二级缓存可能产生脏读问题（A的修改影响B的缓存结果）；多表关联查询中任一表的修改会清空相关缓存；分布式环境下缓存不共享。建议：简单查询开启二级缓存，复杂查询建议关闭或使用Redis等外部缓存。"
+  },
+  {
+    "category": "MyBatis",
+    "question": "MyBatis和Hibernate有什么区别？",
+    "keywords": "ORM vs SQL映射、灵活性、适用场景",
+    "answer": "MyBatis是半自动ORM（SQL映射框架）需要手写SQL，Hibernate是全自动ORM框架自动生成SQL。主要区别：SQL控制：MyBatis直接写SQL精确控制每条查询性能；Hibernate通过HQL或JPQL生成SQL灵活性较低。学习成本：MyBatis上手快只需掌握SQL和XML映射；Hibernate需要学习HQL、缓存机制、关联映射等复杂概念。性能：MyBatis通过手写优化SQL通常性能更好；Hibernate生成的SQL可能不够优化需要调优。关联映射：MyBatis需要手写关联查询或使用嵌套查询；Hibernate支持懒加载、级联操作等丰富映射。数据库移植：Hibernate通过方言支持多数据库；MyBatis需要为不同数据库编写不同的SQL。适用场景：MyBatis适合对SQL有精确控制需求的互联网项目；Hibernate适合业务逻辑复杂、需要快速开发的企业应用。国内互联网公司绝大多数使用MyBatis。"
+  },
+  {
+    "category": "MyBatis",
+    "question": "MyBatis-Plus相比MyBatis有什么增强？",
+    "keywords": "通用CRUD、条件构造器、代码生成",
+    "answer": "MyBatis-Plus是MyBatis的增强工具只做增强不做改变。核心特性：通用CRUD：继承BaseMapper即可获得单表的增删改查方法无需编写XML。条件构造器（Wrapper）：LambdaQueryWrapper和LambdaUpdateWrapper提供链式API构建查询条件如wrapper.eq(User::getName, 张三).gt(User::getAge, 18)，类型安全避免字段名写错。分页插件：PaginationInnerInterceptor开箱即用的分页功能。代码生成器：AutoGenerator一键生成Entity、Mapper、Service、Controller代码。逻辑删除：@TableLogic注解实现软删除。自动填充：@TableField(fill = FieldFill.INSERT)自动填充创建时间等字段。主键策略：@TableId(type = IdType.ASSIGN_ID)雪花算法生成分布式ID。乐观锁：@Version注解实现乐观锁。多数据源：dynamic-datasource-spring-boot-starter支持多数据源切换。MyBatis-Plus极大简化了MyBatis的开发工作量，是当前MyBatis生态的首选。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是设计模式？为什么需要设计模式？",
+    "keywords": "可复用、可维护、最佳实践",
+    "answer": "设计模式是在软件设计中经过验证的针对特定问题的解决方案模板。由GoF（四人帮）在1994年总结归纳为23种经典设计模式。设计模式分为三大类：创建型模式（关注对象创建机制）、结构型模式（关注类和对象的组合）、行为型模式（关注对象间的职责分配和通信）。为什么需要设计模式：提高代码可复用性，通用解决方案可以跨项目使用。提高代码可维护性，遵循固定模式的代码结构清晰易于理解。提高代码扩展性，通过抽象和接口实现松耦合便于修改和扩展。提高团队沟通效率，使用设计模式的术语可以快速传达设计意图如用单例模式、策略模式等名称即可让团队理解设计思路。设计模式不是万能的不能为了使用模式而使用，应该根据实际需求选择合适的模式。过度设计和模式滥用反而增加复杂度。"
+  },
+  {
+    "category": "设计模式",
+    "question": "常见的设计模式有哪些？",
+    "keywords": "23种经典模式分类",
+    "answer": "GoF 23种设计模式按类型分为。创建型（5种）：单例模式确保一个类只有一个实例；工厂方法定义创建对象的接口让子类决定实例化哪个类；抽象工厂提供创建一系列相关对象的接口；建造者模式分步构建复杂对象；原型模式通过复制已有实例创建新对象。结构型（7种）：适配器让接口不兼容的类可以一起工作；桥接将抽象与实现分离；组合将对象组织成树形结构；装饰器动态给对象添加功能；外观提供子系统的统一接口；享元共享细粒度对象；代理为对象提供替身。行为型（11种）：责任链将请求沿链传递；命令将请求封装为对象；迭代器顺序访问聚合对象中的元素；中介者用中介对象封装对象间交互；备忘录保存对象状态；观察者定义一对多的依赖；状态允许对象改变行为；策略定义算法族；模板方法定义算法骨架；访问者不改变类的前提下定义新操作。掌握常用模式即可不必全部背诵。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是策略模式？有哪些应用场景？",
+    "keywords": "算法封装、运行时切换",
+    "answer": "策略模式定义一系列算法将每个算法封装起来使它们可以互相替换。核心思想：将算法的使用和算法的实现分离。结构：Strategy接口定义算法的统一接口；ConcreteStrategy实现具体的算法；Context持有Strategy引用并通过构造器或setter注入具体策略。优点：消除大量的if-else或switch条件分支；算法可以独立变化不影响使用算法的代码；运行时可以动态切换策略。缺点：客户端需要知道所有策略的存在。应用场景：支付方式选择（支付宝、微信、银行卡各自实现pay方法）；排序算法选择（根据数据规模选择快排、归并、堆排）；折扣计算（不同会员等级不同折扣策略）；验证规则（不同业务场景不同的校验逻辑）；日志输出（不同渠道不同日志策略）。Spring中策略模式大量使用，如Resource接口有ClassPathResource、FileSystemResource等多种实现。结合工厂模式或Map可以优雅地管理策略的创建和选择。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是责任链模式？有哪些应用场景？",
+    "keywords": "请求传递、链式处理、松耦合",
+    "answer": "责任链模式将请求的处理者组成一条链，请求沿链传递直到某个处理者处理它。核心思想：解耦请求的发送者和接收者，每个处理者只关注自己能否处理。结构：Handler抽象类定义处理接口和下一个处理者的引用；ConcreteHandler实现具体的处理逻辑。请求从链头开始每个Handler判断自己能否处理，能则处理否则传递给下一个。优点：降低请求发送者和处理者的耦合；增加或修改处理者灵活不影响其他处理者；请求的处理链可以动态配置。缺点：请求可能到达链尾都没被处理；链过长影响性能。应用场景：Servlet的Filter链（字符编码Filter、安全认证Filter、日志Filter）。Netty的ChannelPipeline（解码Handler、业务Handler、编码Handler）。审批流程（员工到主管到总监到VP逐级审批）。异常处理链。Spring Security的过滤器链。日志框架的Appender链。设计时注意链的顺序配置和兜底处理。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是模板方法模式？有哪些应用场景？",
+    "keywords": "算法骨架、钩子方法、代码复用",
+    "answer": "模板方法模式在父类中定义算法的骨架将某些步骤的实现延迟到子类。核心思想：将不变的行为提取到父类中，将可变的行为留给子类实现。结构：AbstractClass定义模板方法（通常是final防止子类重写）和一系列抽象方法和钩子方法；ConcreteClass实现抽象方法和可选的钩子方法。模板方法中的某些步骤调用抽象方法由子类提供具体实现。钩子方法（Hook）提供默认的空实现子类可选择性重写。优点：代码复用消除子类中的重复代码；符合开闭原则新增子类不影响已有代码；控制子类的扩展点。缺点：每个不同的实现需要一个子类增加类的数量。应用场景：HttpServlet的doGet和doPost方法（Servlet容器调用service模板方法根据请求类型调用doGet或doPost）。JdbcTemplate的query方法。JUnit的setUp和tearDown。Spring的JdbcTemplate、RestTemplate。AbstractQueuedSynchronizer的模板方法。Lombok的@Builder。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是观察者模式？有哪些应用场景？",
+    "keywords": "发布订阅、事件驱动、松耦合",
+    "answer": "观察者模式定义对象间的一对多依赖关系当一个对象状态改变时所有依赖它的对象都会收到通知并自动更新。核心思想：对象间的松耦合通信。结构：Subject（主题）维护观察者列表提供attach和detach和notify方法；Observer（观察者）定义update接口接收通知。当Subject状态改变时调用notify遍历所有Observer调用update方法。优点：Subject和Observer松耦合可以独立变化；支持广播通信一对多通知；符合开闭原则新增Observer不需要修改Subject。缺点：通知所有观察者可能有性能开销；观察者过多时通知效率降低；可能导致循环依赖。应用场景：Java的EventListener（AWT或Swing事件处理）。Spring的ApplicationEvent（事件驱动架构）。消息队列的发布订阅模型。Vue或React的数据响应式系统。GUI框架的按钮点击事件。MQTT协议的Topic订阅。Netty的ChannelHandler事件通知。实现时注意避免内存泄漏（及时remove观察者）和通知顺序的可控性。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是代理模式？有哪些应用场景？",
+    "keywords": "真实对象代理、访问控制、AOP",
+    "answer": "代理模式为目标对象提供一个代理对象以控制对目标对象的访问。代理对象与目标对象实现相同的接口，客户端通过代理间接访问目标。类型：静态代理在编译时创建代理类。动态代理在运行时创建代理类：JDK动态代理基于接口（java.lang.reflect.Proxy + InvocationHandler）；CGLIB代理基于继承生成目标类的子类。代理的作用：远程代理（隐藏网络通信细节如RPC框架）。虚拟代理（延迟创建开销大的对象如图片懒加载）。保护代理（访问控制和权限检查）。日志代理（记录方法调用日志）。缓存代理（缓存计算结果）。应用场景：Spring AOP通过代理实现事务管理和日志记录。RPC框架（Dubbo、gRPC）通过代理隐藏远程调用细节。MyBatis Mapper接口通过动态代理实现SQL执行。Nginx反向代理隐藏后端服务器。延迟加载Hibernate的懒加载。代理模式是实现AOP和远程调用的基础。"
+  },
+  {
+    "category": "设计模式",
+    "question": "工厂模式和抽象工厂模式有什么区别？",
+    "keywords": "产品等级vs产品族",
+    "answer": "工厂方法模式：定义创建对象的接口由子类决定实例化哪个类。每个产品对应一个工厂类，新增产品只需新增工厂类。关注点是单一产品族的创建。结构：Product接口加ConcreteProduct；Factory接口加ConcreteFactory。抽象工厂模式：提供创建一系列相关产品族的接口而不指定具体类。一个工厂可以创建多个相关产品。关注点是产品族的创建。结构：AbstractFactory定义创建多个产品的方法；ConcreteFactory实现一组产品的创建。区别：工厂方法针对单个产品抽象工厂针对产品族。工厂方法通过继承扩展抽象工厂通过组合扩展。工厂方法增加新产品只需增加工厂类抽象工厂增加新产品族需要修改抽象工厂接口（违反开闭原则）。场景：工厂方法适合只有一个产品维度如日志记录器（文件或数据库或控制台）。抽象工厂适合多个产品维度如UI组件（按钮加文本框加下拉框）的不同风格（暗色或亮色）。Spring BeanFactory是工厂方法的体现。"
+  },
+  {
+    "category": "设计模式",
+    "question": "什么是单例模式？有哪些实现方式？",
+    "keywords": "线程安全、懒加载、双重检查",
+    "answer": "单例模式确保一个类只有一个实例并提供全局访问点。实现方式：饿汉式类加载时就创建实例，线程安全但不能懒加载。懒汉式第一次使用时创建实例，需要synchronized保证线程安全但性能差。双重检查锁定（DCL）volatile加synchronized实现线程安全的懒加载，既保证延迟初始化又保证性能。静态内部类利用类加载机制实现懒加载且线程安全，推荐使用。枚举实现单例最简洁且天然防止反射和序列化攻击。volatile关键字在DCL中的作用：防止指令重排导致其他线程获取到未初始化的对象（new对象分为分配内存、初始化、引用赋值三步可能重排）。单例的破坏：反射可以调用私有构造器创建多个实例（通过setAccessible）。序列化和反序列化可能创建新实例（实现readResolve方法）。枚举是最安全的单例实现方式。Spring中的Bean默认是单例的通过BeanFactory管理。"
+  },
+  {
+    "category": "设计模式",
+    "question": "单例模式有哪些实现方式？线程安全的有哪些？",
+    "keywords": "饿汉、懒汉、DCL、静态内部类、枚举",
+    "answer": "单例模式五种实现方式。饿汉式：类加载时静态变量直接初始化实例，JVM保证线程安全，缺点是不能懒加载可能浪费内存。懒汉式：方法加synchronized保证线程安全但每次调用都加锁性能差。双重检查锁定（DCL）：volatile修饰实例变量加synchronized代码块，第一次创建时才加锁检查，后续直接返回实例。线程安全且支持懒加载。静态内部类：StaticSingleton类持有Instance实例在静态内部类Holder中，JVM加载Holder类时初始化实例，既延迟加载又线程安全。推荐方式。枚举：Java保证枚举实例全局唯一且天然防止反射和序列化攻击，Effective Java推荐的单例实现。线程安全分析：饿汉式（类加载机制保证）、DCL（volatile禁止重排加synchronized保证原子性）、静态内部类（类加载机制保证）、枚举（JVM保证）。懒汉式如果不加synchronized则线程不安全。面试重点：DCL中的volatile作用、各实现方式的优缺点对比。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何设计一个秒杀系统？",
+    "keywords": "前端限流、库存预扣、异步下单",
+    "answer": "秒杀系统设计核心是高并发下的库存扣减和订单创建。前端：页面静态化加CDN减少后端压力。按钮防重复点击和倒计时。验证码和答题机制分散请求。接入层：Nginx负载均衡加限流。静态资源由CDN和Nginx直接返回。应用层：本地缓存加Redis预扣库存。秒杀开始前将库存加载到Redis中，使用DECR原子操作预扣库存，扣减成功后再异步创建订单。数据库层：使用数据库乐观锁或SELECT ... FOR UPDATE确保最终库存一致。下单异步化：通过MQ将订单请求异步处理削峰。核心设计：库存预热（秒杀开始前加载到Redis）。多级缓存（CDN到本地缓存到Redis）。限流控制（接口限流、用户限流）。数据预热（秒杀商品提前加载）。防刷策略（IP限制、用户限购）。订单超时未支付释放库存（延迟队列）。监控告警（实时监控QPS、成功率、库存变化）。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何生成全局唯一ID？",
+    "keywords": "UUID、雪花算法、号段模式",
+    "answer": "全局唯一ID生成方案。UUID：32位十六进制字符串，完全去中心化无需网络通信。缺点：无序导致B+树插入效率低；太长占用空间；不包含时间信息。雪花算法（Snowflake）：64位ID由时间戳（41位）加机器ID（10位）加序列号（12位）组成。优点：趋势递增、高性能、包含时间信息。缺点：依赖机器时钟时钟回拨可能产生重复ID。百度UidGenerator对雪花算法进行了优化。号段模式：数据库中维护一个号段表每次申请一段ID（如1000个）内存中分配。优点：有序递增、对数据库压力小。缺点：服务重启可能浪费已申请的号段。Leaf（美团开源）同时支持号段模式和雪花模式。Redis自增：使用INCR命令生成递增ID性能高但需要保证原子性。选择建议：一般场景用雪花算法；需要绝对唯一用UUID；对有序性要求高用号段模式。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何设计一个短链系统？",
+    "keywords": "哈希映射、Base62、302重定向",
+    "answer": "短链系统设计将长URL转换为短URL。核心设计：短链生成策略。哈希取模：对长URL计算MD5或SHA256取前6位转为Base62（a-z、A-Z、0-9）编码。直接自增ID：数据库自增ID转Base62编码简单有序但可预测。随机生成加去重：随机生成短码存入数据库检查唯一性。存储设计：MySQL存储原始URL和短码的映射关系，对短码建唯一索引。Redis缓存热点映射减少数据库查询。重定向方式：301永久重定向（浏览器缓存减少服务器压力但不利于统计）和302临时重定向（便于统计分析每次访问都经过服务器）。防止短码冲突：先检查数据库是否已存在，冲突则重新生成。统计功能：记录每次访问的PV、UV、来源等信息。短码长度：6位Base62可以表示568亿种组合足够使用。高可用：数据库读写分离、Redis集群、多级缓存。扩展：自定义短码、过期时间、访问权限控制。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何设计一个RPC框架？",
+    "keywords": "动态代理、序列化、网络传输、服务发现",
+    "answer": "RPC框架核心组件设计。客户端：动态代理封装远程调用为本地方法调用（JDK动态代理或CGLIB）。负载均衡（轮询、随机、一致性Hash）。超时控制和重试机制。服务端：自定义协议（魔数加版本加序列化类型加消息类型加请求ID加数据长度加数据体）。Netty作为网络通信层处理IO。线程池隔离不同服务的请求。序列化：支持多种序列化方式（Protobuf、Kryo、JSON）可插拔。选择高效的二进制序列化提高性能。服务注册与发现：集成Nacos或Zookeeper注册中心，服务启动注册自身地址，客户端订阅获取地址列表。连接管理：长连接复用、心跳检测、空闲连接清理。扩展点：Filter链实现拦截逻辑（日志、鉴权、限流）。异步调用（CompletableFuture）。回调通知。泛化调用（未引入接口也能调用）。主流RPC框架：Dubbo（阿里）、gRPC（Google）、Thrift（Facebook）。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何设计一个点赞系统？",
+    "keywords": "数据结构、计数器、去重、排行榜",
+    "answer": "点赞系统核心设计。数据模型：点赞关系表（user_id, target_id, type, create_time）记录谁赞了什么，联合唯一索引防重复。使用Redis Set存储点赞用户集合（SADD、SCARD、SISMEMBER），支持快速判断是否已赞。计数方案：Redis计数器INCR或DECR原子操作。数据库计数器与Redis异步同步。热点数据使用本地缓存加Redis二级缓存。去重实现：Redis Set天然去重。数据库唯一索引兜底。前端缓存已赞状态。批量点赞优化：Pipeline批量操作Redis。异步写入数据库。排行榜：Redis ZSet按点赞数排序（ZINCRBY、ZREVRANGE）。时间维度排行榜（日榜、周榜、月榜）使用不同Key。性能优化：点赞数热点数据使用Redis Hash分散存储。点赞列表按时间分页使用游标分页而非OFFSET。取关时从Set移除并DECR计数。数据一致性：Redis作为读缓存数据库作为最终存储。异步消息确保数据同步。大V的点赞数和列表需要特殊处理避免缓存击穿。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何实现分布式锁？",
+    "keywords": "Redis实现、Zookeeper实现、Redlock",
+    "answer": "分布式锁是跨进程的互斥机制。Redis实现：SET key value NX EX timeout，释放时用Lua脚本比较value并删除（原子操作）。问题：锁过期但业务未完成可通过Redisson看门狗自动续期。主从切换时锁可能丢失。Zookeeper实现：创建临时有序节点（/lock/node_xxx），序号最小的获取锁。释放锁删除节点。通过Watcher监听前一个节点释放事件实现公平锁。优点：强一致性；缺点：性能不如Redis。Redlock算法：向N个独立Redis实例请求加锁超过半数成功且总耗时小于锁有效期则成功。争议：Martin Kleppmann指出在网络分区等场景下Redlock不可靠。建议使用场景：缓存更新、秒杀库存扣减、定时任务防重复执行、数据库乐观锁替代。生产建议：使用Redisson框架处理续期和异常恢复。设置合理的锁超时时间。业务中使用try-finally确保释放。考虑使用可重入锁支持同一线程多次加锁。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "千万级别的大表如何优化？",
+    "keywords": "分库分表、索引优化、读写分离",
+    "answer": "千万级大表优化方案。索引优化：分析慢查询确保关键查询有合适索引。使用覆盖索引减少回表。定期清理无用索引。SQL优化：避免SELECT *只查需要的列。大分页使用延迟关联。JOIN优化小表驱动大表。避免在WHERE中对索引列使用函数。表结构优化：选择合适的数据类型（TINYINT代替INT能省一半空间）。垂直分表拆分大字段。历史数据归档到历史表。分库分表：水平分片按用户ID或时间维度。使用ShardingSphere中间件实现透明化分片。分片策略：Hash取模均匀分布但扩容困难；范围分片便于扩容但可能热点。读写分离：主库写从库读。解决主从延迟问题（关键读走主库）。缓存策略：热点数据放Redis。查询缓存减少数据库访问。数据迁移：双写方案迁移期间新旧库同时写入。灰度切流逐步将流量从旧表迁移到新分片。监控告警：监控慢查询、连接数、磁盘使用。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "服务器CPU使用率过高如何排查？",
+    "keywords": "top、jstack、Arthas、火焰图",
+    "answer": "CPU过高排查流程。第一步：top命令找到CPU占用高的进程PID。第二步：top -Hp PID找到CPU占用高的线程TID。第三步：printf '%x' TID将线程ID转为十六进制。第四步：jstack PID | grep '十六进制TID' -A 30查看线程堆栈定位问题代码。常见原因：死循环或复杂计算。频繁GC（jstat -gcutil PID观察GC情况）。锁竞争激烈（线程大量BLOCKED状态）。正则表达式回溯（ReDoS）。序列化或反序列化开销大。进阶排查：Arthas dashboard实时监控线程状态和CPU使用。Arthas thread -n 5查看最忙的5个线程。Arthas profiler生成火焰图分析热点方法。jmap -histo:live PID查看对象分布排除内存问题。JFR（Java Flight Recorder）低开销记录JVM运行数据。GC日志分析确认是否Full GC频繁。常见解决方案：优化死循环。减少锁粒度。使用线程池替代直接创建线程。缓存计算结果。优化算法复杂度。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "Redis内存使用过高怎么排查？",
+    "keywords": "INFO、bigkeys、memory doctor",
+    "answer": "Redis内存过高排查流程。查看内存使用：INFO memory获取used_memory、used_memory_rss、mem_fragmentation_ratio等指标。memory doctor给出内存诊断建议。定位大Key：redis-cli --bigkeys扫描各类型最大的key。redis-cli --memkeys按内存排序查看。MEMORY USAGE key查看具体key占用。分析Key分布：redis-cli --scan配合分析脚本统计各业务Key的内存占用。检查是否有过期时间过长或未设置过期时间的Key。常见原因：大Key存储了过多数据（如几百万元素的Set）。Key未设置过期时间持续增长。内存碎片化严重（mem_fragmentation_ratio大于1.5）。缓冲区占用（client输出缓冲区、AOF缓冲区）。短连接导致连接数过多占用内存。解决方案：大Key拆分为多个小Key。设置合理的TTL。使用UNLINK异步删除大Key。主动碎片整理（activedefrag yes）。使用hash-max-ziplist-entries等参数优化编码。清理无用Key和过期Key。优化数据结构如小Hash用ziplist编码。内存达到maxmemory时合理选择淘汰策略。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何排查Redis连接数过多的问题？",
+    "keywords": "INFO clients、连接池配置、短连接",
+    "answer": "Redis连接数过多排查。查看当前连接：INFO clients获取connected_clients、blocked_clients等。CLIENT LIST查看每个连接的详细信息（地址、空闲时间、缓冲区大小等）。常见原因：短连接问题：客户端每次操作创建新连接用完不关闭。应该使用连接池复用连接。连接池配置不合理：最大连接数设置过大或未配置。泄漏问题：连接获取后异常退出未归还到连接池。客户端异常频繁重连。解决措施：使用长连接加连接池：Jedis使用JedisPool、Lettuce使用连接池。设置合理的maxTotal和maxIdle。设置连接空闲检测和回收。监控连接数变化趋势设置告警。检查代码中是否有未关闭的连接（try-finally或try-with-resources）。限制每个客户端的连接数。Redis端设置maxclients限制。使用Redis连接池中间件。分析CLIENT LIST找出异常客户端（如空闲时间过长的连接）。优化应用的并发模型减少不必要的连接。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "如何进行MySQL的SQL调优？",
+    "keywords": "慢查询、EXPLAIN、索引、执行计划",
+    "answer": "MySQL SQL调优完整流程。定位慢查询：开启慢查询日志slow_query_log=ON设置long_query_time。使用pt-query-digest分析慢查询Top N。EXPLAIN分析：type列（const大于eq_ref大于ref大于range大于index大于ALL）判断访问效率。key列查看是否使用索引。rows评估扫描行数。Extra中Using filesort和Using temporary需要优化。优化策略：创建合适索引（覆盖索引、联合索引遵循最左前缀）。避免SELECT *减少IO。优化JOIN（小表驱动大表、被驱动表建索引避免全表扫描）。LIMIT优化（延迟关联SELECT * FROM t INNER JOIN (SELECT id FROM t LIMIT offset, size) tmp ON t.id=tmp.id）。子查询改写为JOIN。避免在WHERE中对索引列使用函数。避免隐式类型转换。使用UNION ALL替代UNION去重。大批量操作分批执行。索引设计原则：高选择性列优先。前缀索引注意长度选择。定期使用sys.schema_unused_indexes清理无用索引。"
+  },
+  {
+    "category": "系统设计 & 场景题",
+    "question": "分库分表有哪些类型？各自适用场景？",
+    "keywords": "垂直分库、垂直分表、水平分库、水平分表",
+    "answer": "分库分表四种类型及适用场景。垂直分库：按业务模块拆分数据库如用户表到user_db、订单表到order_db、商品表到product_db。适用场景：业务模块耦合严重；不同业务对数据库资源需求不同（如订单库写多读少）；需要对不同业务独立运维。优点：业务解耦、资源隔离。缺点：跨库JOIN困难。垂直分表：将大字段（TEXT或BLOB）或低频字段拆到扩展表如user表拆为user_basic和user_detail。适用场景：表字段过多；某些字段占用空间大导致单行数据过大影响查询效率。水平分库：同一张表数据按分片键分散到多个数据库如user按user_id%8拆到8个库。适用场景：单表数据量超过2000万行；单库连接数或IO达瓶颈。优点：突破单机限制。缺点：分布式事务、跨分片查询、全局ID。水平分表：同一数据库内将表拆为多张如user拆为user_0到user_15。适用场景：单表数据量大但数据库压力不大。选择建议：优先垂直拆分解决耦合，数据量增长后再水平拆分。"
+  }
+]
