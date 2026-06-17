@@ -15,5 +15,7 @@ src/main/resources/application.yml
 .DS_Store
 Thumbs.db
 
-# Other project files
+# Other files
 SmartAgent_学习计划.md
+计划.md
+spring_ai_questions.json
