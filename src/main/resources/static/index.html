@@ -68,7 +68,7 @@
     <div class="chat-box" id="chatBox"></div>
 
     <div class="input-area">
-        <input type="text" id="messageInput" placeholder="输入消息..." onkeypress="if(event.key==='Enter')sendMessage()">
+        <input type="text" id="messageInput" placeholder="输入消息..." maxlength="2000" onkeypress="if(event.key==='Enter')sendMessage()">
         <button id="sendBtn" onclick="sendMessage()">发送</button>
     </div>
 
@@ -77,7 +77,6 @@
         let currentMode = 'chat';
         let sessionId = 'user_' + Date.now();
         let isStreaming = false;
-        let currentQuestion = '';
 
         function toggleToolbox() {
             document.getElementById('toolboxDropdown').classList.toggle('show');
@@ -127,7 +126,6 @@
         }
 
         function clearChat() {
-            currentQuestion = '';
             const chatBox = document.getElementById('chatBox');
             const divider = document.createElement('div');
             divider.style.cssText = 'text-align:center;color:#999;font-size:12px;margin:20px 0;position:relative;';
@@ -177,17 +175,19 @@
         async function handleRandom(message) {
             const bubble = addMessage('', 'assistant');
             try {
-                const res = await fetch('/chat?message=' + encodeURIComponent(message) + '&sessionId=' + sessionId + '&mode=' + currentMode);
+                const res = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message, sessionId, mode: currentMode})
+                });
                 const data = await res.json();
                 if (data.type === 'question') {
-                    currentQuestion = data.question;
                     if (currentMode === 'interview') {
                         bubble.innerHTML = '<b>第 ' + data.index + ' 题：</b>' + data.question + '<br><br><i>请回答，回答后我会评分</i>';
                     } else {
                         bubble.innerHTML = '<b>' + data.question + '</b><br><br>分类：' + data.category + '<br>关键词：' + data.keywords + '<br><br><i>请输入你的回答</i>';
                     }
                 } else if (data.type === 'evaluate') {
-                    currentQuestion = '';
                     bubble.innerHTML = marked.parse(data.reply) + '<br><br><details><summary style="cursor:pointer;color:#666;">点击查看标准答案</summary><div style="margin-top:8px;padding:10px;background:#f5f5f5;border-radius:8px;">' + marked.parse(data.answer) + '</div></details>';
                 } else {
                     bubble.textContent = JSON.stringify(data);
@@ -202,8 +202,8 @@
             try {
                 const res = await fetch('/chat/stream', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                    body: 'message=' + encodeURIComponent(message) + '&sessionId=' + sessionId + '&mode=' + currentMode
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message, sessionId, mode: currentMode})
                 });
 
                 const reader = res.body.getReader();
@@ -215,8 +215,8 @@
                     if (done) break;
                     const chunk = decoder.decode(value);
                     chunk.split('\n').forEach(line => {
-                        if (line.startsWith('data:')) {
-                            text += line.substring(5);
+                        if (line.startsWith('data:') && !line.includes('[DONE]')) {
+                            text += line.substring(5).trim();
                             bubble.innerHTML = marked.parse(text);
                         }
                     });

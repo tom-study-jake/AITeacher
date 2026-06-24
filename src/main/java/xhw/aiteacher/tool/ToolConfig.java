@@ -1,9 +1,16 @@
 package xhw.aiteacher.tool;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.googlecode.aviator.AviatorEvaluator;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 
 @Configuration
 public class ToolConfig {
@@ -31,18 +38,20 @@ public class ToolConfig {
     }
 
     public static class WeatherTool {
+        private static final HttpClient HTTP_CLIENT = HttpClient.newHttpClient();
+        private static final ObjectMapper MAPPER = new ObjectMapper();
+
         @Tool(description = "查询指定城市的天气")
         public String getWeather(String city) {
             try {
                 String url = "https://wttr.in/" + city + "?format=j1";
-                java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
-                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
-                        .uri(java.net.URI.create(url))
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
                         .build();
-                java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
-                String body = response.body();
-                String weather = body.replaceAll(".*\"weatherDesc\"\\s*:\\s*\\[\\s*\\{\\s*\"value\"\\s*:\\s*\"(.*)\".*", "$1");
-                String temp = body.replaceAll(".*\"temp_C\"\\s*:\\s*\"(.*)\".*", "$1");
+                HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+                JsonNode root = MAPPER.readTree(response.body());
+                String weather = root.path("current_condition").get(0).path("weatherDesc").get(0).path("value").asText();
+                String temp = root.path("current_condition").get(0).path("temp_C").asText();
                 return city + "天气: " + weather + "，" + temp + "°C";
             } catch (Exception e) {
                 return "查询天气失败: " + e.getMessage();
